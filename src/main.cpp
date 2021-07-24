@@ -1,15 +1,16 @@
+#include <boost/asio.hpp>
+#include <boost/system/error_code.hpp>
+
 #include <iomanip>
 #include <iostream>
 #include <thread>
-
-#include <boost/asio.hpp>
-#include <boost/system/error_code.hpp>
 
 using tcp = boost::asio::ip::tcp;
 
 void Log(boost::system::error_code ec)
 {
-    std::cerr << (ec ? "Error: " : "OK")
+    std::cerr << "[" << std::setw(14) << std::this_thread::get_id() << "] "
+              << (ec ? "Error: " : "OK")
               << (ec ? ec.message() : "")
               << std::endl;
 }
@@ -21,12 +22,17 @@ void OnConnect(boost::system::error_code ec)
 
 int main()
 {
+    std::cerr << "[" << std::setw(14) << std::this_thread::get_id() << "] main"
+              << std::endl;
+
     // Always start with an I/O context object.
     boost::asio::io_context ioc {};
 
     // Create an I/O object. Every Boost.Asio I/O object API needs an io_context
     // as the first parameter.
-    tcp::socket socket {ioc};
+    tcp::socket socket {boost::asio::make_strand(ioc)};
+
+    size_t nThreads {4};
 
     // Under the hood, socket.connect uses I/O context to talk to the socket
     // and get a response back. The response is saved in ec.
@@ -37,18 +43,22 @@ int main()
         Log(ec);
         return -1;
     }
-    socket.async_connect(*resolverIt, OnConnect);
+    for (size_t idx {0}; idx < nThreads; ++idx) {
+        socket.async_connect(*resolverIt, OnConnect);
+    }
 
     // We must call io_context::run for asynchronous callbacks to run.
-    std::thread thread {[&ioc]() {
-        std::cerr << "["
-                  << std::setw(14) << std::this_thread::get_id()
-                  << "] ioc.run()"
-                  << std::endl;
-        ioc.run();
-    }};
-    std::cout << "all g" << std::endl;
-    thread.join();
+    std::vector<std::thread> threads {};
+    threads.reserve(nThreads);
+    for (size_t idx {0}; idx < nThreads; ++idx) {
+        threads.emplace_back([&ioc]() {
+            ioc.run();
+        });
+    }
+    // Clean up threads before finishing main
+    for (size_t idx {0}; idx < nThreads; ++idx) {
+        threads[idx].join();
+    }
 
     return 0;
 }
