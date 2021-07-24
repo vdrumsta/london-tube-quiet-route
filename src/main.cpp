@@ -1,4 +1,5 @@
 #include <boost/asio.hpp>
+#include <boost/beast.hpp>
 #include <boost/system/error_code.hpp>
 
 #include <iomanip>
@@ -6,10 +7,12 @@
 #include <thread>
 
 using tcp = boost::asio::ip::tcp;
+using namespace boost::beast;
+using namespace boost::beast::websocket;
 
-void Log(boost::system::error_code ec)
+void Log(boost::system::error_code ec, std::string&& context = "")
 {
-    std::cerr << "[" << std::setw(14) << std::this_thread::get_id() << "] "
+    std::cerr << context << " "
               << (ec ? "Error: " : "OK")
               << (ec ? ec.message() : "")
               << std::endl;
@@ -22,9 +25,6 @@ void OnConnect(boost::system::error_code ec)
 
 int main()
 {
-    std::cerr << "[" << std::setw(14) << std::this_thread::get_id() << "] main"
-              << std::endl;
-
     // Always start with an I/O context object.
     boost::asio::io_context ioc {};
 
@@ -38,27 +38,37 @@ int main()
     // and get a response back. The response is saved in ec.
     boost::system::error_code ec {};
     tcp::resolver resolver {ioc};
-    auto resolverIt {resolver.resolve("google.com", "80", ec)};
-    if (ec) {
+    std::string url{"echo.websocket.org"};
+    auto resolverIt {resolver.resolve(url, "80", ec)};
+    if (ec) {   // Checking if resolver endpoint is valid
         Log(ec);
         return -1;
     }
-    for (size_t idx {0}; idx < nThreads; ++idx) {
-        socket.async_connect(*resolverIt, OnConnect);
-    }
+    socket.connect(*resolverIt, ec);
+    Log(ec, "TCP connection");
+    
+    // Tie the socket object to the WebSocket stream and attempt an handshake.
+    websocket::stream<boost::beast::tcp_stream> ws {std::move(socket)};
+    ws.handshake(url, "/", ec);
+    Log(ec, "WebSocket handshake");
+    
+    // Tell the WebSocket object to exchange messages in text format.
+    ws.text(true);
 
-    // We must call io_context::run for asynchronous callbacks to run.
-    std::vector<std::thread> threads {};
-    threads.reserve(nThreads);
-    for (size_t idx {0}; idx < nThreads; ++idx) {
-        threads.emplace_back([&ioc]() {
-            ioc.run();
-        });
-    }
-    // Clean up threads before finishing main
-    for (size_t idx {0}; idx < nThreads; ++idx) {
-        threads[idx].join();
-    }
+    std::string message{"Hello world!"};
+    // Send a message to the connected WebSocket server.
+    boost::asio::const_buffer wbuffer {message.c_str(), message.size()};
+    ws.write(wbuffer, ec);
+    Log(ec, "WebSocket write");
+
+    // Read the echoed message back.
+    boost::beast::flat_buffer rbuffer {};
+    ws.read(rbuffer, ec);
+
+    // Print the echoed message.
+    std::cout << "ECHO: "
+            << boost::beast::make_printable(rbuffer.data())
+            << std::endl;
 
     return 0;
 }
