@@ -11,7 +11,7 @@ list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 if(EXISTS ${CMAKE_CURRENT_BINARY_DIR}/conaninfo.txt)
     list(PREPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_BINARY_DIR}")
 endif()
-find_package(Boost 1.74 REQUIRED COMPONENTS system)
+find_package(Boost 1.76 REQUIRED COMPONENTS system)
 
 # On Windows, we define a preprocessor symbol with the OS version to prevent
 # warnings from the Boost.Asio header files.
@@ -20,12 +20,15 @@ if(WIN32)
     get_win_ver(WINDOWS_VERSION)
 endif()
 
-set(SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/src/main.cpp")
+set(SOURCES
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/main.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/websocket-client.cpp"
+)
 
 add_executable(network-monitor ${SOURCES})
 target_compile_features(network-monitor
     PRIVATE
-        cxx_std_11
+        cxx_std_14
 )
 target_compile_definitions(network-monitor
     PRIVATE
@@ -34,4 +37,10 @@ target_compile_definitions(network-monitor
 target_link_libraries(network-monitor
     PRIVATE
         Boost::Boost
+)
+
+# Tell CMake to look for header files in these directories
+target_include_directories(network-monitor
+    PRIVATE
+        src
 )

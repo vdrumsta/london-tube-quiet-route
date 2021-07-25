@@ -1,5 +1,8 @@
 {
-    "cmake.configureOnOpen": false,
+    "cmake.copyCompileCommands": "${workspaceFolder}/compile_commands.json",
+    "cmake.buildDirectory": "${workspaceRoot}/build",
+    "cmake.preferredGenerators": ["Ninja"],
+    "C_Cpp.default.configurationProvider": "vector-of-bool.cmake-tools",
     "files.associations": {
         "array": "cpp",
         "atomic": "cpp",
@@ -44,6 +47,8 @@
         "ctime": "cpp",
         "ratio": "cpp",
         "iomanip": "cpp",
-        "thread": "cpp"
-    }
+        "thread": "cpp",
+        "*.ipp": "cpp"
+    },
+    "cmake.configureOnOpen": true
 }
