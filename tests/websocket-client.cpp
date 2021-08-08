@@ -1,12 +1,15 @@
 #include <network-monitor/websocket-client.h>
 
 #include <boost/asio.hpp>
+#include <boost/asio/ssl.hpp>
 #include <boost/test/unit_test.hpp>
 
 #include <string>
 #include <filesystem>
 
+using boost::asio::ip::tcp;
 using NetworkMonitor::WebSocketClient;
+namespace ssl = boost::asio::ssl;
 
 BOOST_AUTO_TEST_SUITE(network_monitor);
 
@@ -14,15 +17,18 @@ BOOST_AUTO_TEST_CASE(class_WebSocketClient)
 {
     // Connection targets
     const std::string url {"echo.websocket.org"};
-    const std::string port {"80"};
+    const std::string port {"443"};
     const std::string message {"Hello WebSocket"};
     std::string echo{};
 
     // Always start with an I/O context object.
     boost::asio::io_context ioc {};
 
+    ssl::context ctx(ssl::context::tlsv12_client);
+    ctx.load_verify_file(TESTS_CACERT_PEM); // TESTS_CACERT_PEM is defined in CMake
+
     // The class under test
-    WebSocketClient client {url, port, ioc};
+    WebSocketClient client {url, port, ioc, ctx};
 
     // We use these flags to check that the connection, send, receive functions
     // work as expected.

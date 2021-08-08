@@ -67,6 +67,7 @@ target_link_libraries(network-monitor-tests
     PRIVATE
         network-monitor
         Boost::Boost
+        OpenSSL::OpenSSL
 )
 add_test(
     NAME network-monitor-tests
