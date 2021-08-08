@@ -31,7 +31,7 @@ set(LIB_SOURCES
 add_library(network-monitor STATIC ${LIB_SOURCES})
 target_compile_features(network-monitor
     PUBLIC
-        cxx_std_14
+        cxx_std_17
 )
 target_compile_definitions(network-monitor
     PRIVATE
@@ -56,11 +56,12 @@ set(TESTS_SOURCES
 add_executable(network-monitor-tests ${TESTS_SOURCES})
 target_compile_features(network-monitor-tests
     PRIVATE
-        cxx_std_14
+        cxx_std_17
 )
 target_compile_definitions(network-monitor-tests
     PRIVATE
         $<$<PLATFORM_ID:Windows>:_WIN32_WINNT=${WINDOWS_VERSION}>
+        TESTS_CACERT_PEM="${CMAKE_CURRENT_SOURCE_DIR}/tests/cacert.pem"
 )
 target_link_libraries(network-monitor-tests
     PRIVATE

@@ -1,0 +1,4 @@
+[ZoneTransfer]
+ZoneId=3
+ReferrerUrl=https://curl.se/docs/caextract.html
+HostUrl=https://curl.se/ca/cacert.pem
