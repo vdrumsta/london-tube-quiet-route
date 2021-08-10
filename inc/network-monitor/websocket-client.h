@@ -22,12 +22,15 @@ public:
      *
      *  \param url  The URL of the server.
      *  \param port The port on the server.
+     *  \param endpoint The endpoint on the server to connect to.
+     *                  Example: echo.websocket.org/<endpoint>
      *  \param ioc  The io_context object. The user takes care of calling
      *              ioc.run().
      *  \param ctx  The TLS context to setup a TLS socket stream.
      */
     WebSocketClient(
         const std::string& url,
+        const std::string& endpoint,
         const std::string& port,
         boost::asio::io_context& ioc,
         boost::asio::ssl::context& ctx
@@ -76,6 +79,7 @@ public:
 
 private:
     std::string url_ {};
+    std::string endpoint_ {};
     std::string port_ {};
 
     // We leave these uninitialized because they do not support a default
