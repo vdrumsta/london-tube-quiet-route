@@ -2,10 +2,14 @@
 
 #include <cpr/cpr.h>
 
+#include <nlohmann/json.hpp>
+
 #include <filesystem>
 #include <string>
 #include <iostream>
 #include <fstream>
+
+using json = nlohmann::json;
 
 bool NetworkMonitor::DownloadFile(
     const std::string& fileUrl,
@@ -37,4 +41,19 @@ bool NetworkMonitor::DownloadFile(
         ofs.close();
     }
     return true;
+}
+
+nlohmann::json NetworkMonitor::ParseJsonFile(const std::filesystem::path& source)
+{
+    nlohmann::json parsed {};
+    if (!std::filesystem::exists(source)) {
+        return parsed;
+    }
+    try {
+        std::ifstream file {source};
+        file >> parsed;
+    } catch (...) {
+        // Will return an empty object.
+    }
+    return parsed;
 }

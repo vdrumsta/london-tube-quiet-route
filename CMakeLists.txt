@@ -15,6 +15,7 @@ find_package(Boost 1.76 REQUIRED COMPONENTS system unit_test_framework)
 find_package(CURL REQUIRED)
 find_package(cpr REQUIRED)
 find_package(OpenSSL REQUIRED)
+find_package(nlohmann_json REQUIRED)
 
 # Called before any other target is defined.
 enable_testing()
@@ -45,6 +46,7 @@ target_link_libraries(network-monitor
         Boost::Boost
         OpenSSL::OpenSSL
         cpr::cpr
+        nlohmann_json::nlohmann_json
 )
 # Tell CMake to look for header files in these directories
 target_include_directories(network-monitor
@@ -67,12 +69,14 @@ target_compile_definitions(network-monitor-tests
     PRIVATE
         $<$<PLATFORM_ID:Windows>:_WIN32_WINNT=${WINDOWS_VERSION}>
         TESTS_CACERT_PEM="${CMAKE_CURRENT_SOURCE_DIR}/tests/cacert.pem"
+        TEST_NETWORK_LAYOUT="${CMAKE_CURRENT_SOURCE_DIR}/tests/network-layout.json"
 )
 target_link_libraries(network-monitor-tests
     PRIVATE
         network-monitor
         Boost::Boost
         OpenSSL::OpenSSL
+        nlohmann_json::nlohmann_json
 )
 add_test(
     NAME network-monitor-tests

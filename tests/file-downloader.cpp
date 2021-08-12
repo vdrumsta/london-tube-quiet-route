@@ -8,6 +8,7 @@
 #include <string>
 
 using NetworkMonitor::DownloadFile;
+using NetworkMonitor::ParseJsonFile;
 
 BOOST_AUTO_TEST_SUITE(network_monitor);
 
@@ -44,6 +45,19 @@ BOOST_AUTO_TEST_CASE(file_downloader)
 
     // Clean up.
     std::filesystem::remove(destination);
+}
+
+BOOST_AUTO_TEST_CASE(network_layout_parser)
+{
+    std::filesystem::path layoutPath{TEST_NETWORK_LAYOUT};
+    auto parsedFile = ParseJsonFile(layoutPath);
+    BOOST_CHECK(parsedFile.is_object());
+    BOOST_CHECK(parsedFile.contains("lines"));
+    BOOST_CHECK(parsedFile.at("lines").size() > 0);
+    BOOST_CHECK(parsedFile.contains("stations"));
+    BOOST_CHECK(parsedFile.at("stations").size() > 0);
+    BOOST_CHECK(parsedFile.contains("travel_times"));
+    BOOST_CHECK(parsedFile.at("travel_times").size() > 0);
 }
 
 BOOST_AUTO_TEST_SUITE_END();
