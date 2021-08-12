@@ -12,6 +12,8 @@ if(EXISTS ${CMAKE_CURRENT_BINARY_DIR}/conaninfo.txt)
     list(PREPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_BINARY_DIR}")
 endif()
 find_package(Boost 1.76 REQUIRED COMPONENTS system unit_test_framework)
+find_package(CURL REQUIRED)
+find_package(cpr REQUIRED)
 find_package(OpenSSL REQUIRED)
 
 # Called before any other target is defined.
@@ -27,6 +29,7 @@ endif()
 # Libraries
 set(LIB_SOURCES
     "${CMAKE_CURRENT_SOURCE_DIR}/src/websocket-client.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/file-downloader.cpp"
 )
 add_library(network-monitor STATIC ${LIB_SOURCES})
 target_compile_features(network-monitor
@@ -41,6 +44,7 @@ target_link_libraries(network-monitor
     PUBLIC
         Boost::Boost
         OpenSSL::OpenSSL
+        cpr::cpr
 )
 # Tell CMake to look for header files in these directories
 target_include_directories(network-monitor
@@ -52,6 +56,7 @@ target_include_directories(network-monitor
 set(TESTS_SOURCES
     "${CMAKE_CURRENT_SOURCE_DIR}/tests/main.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/tests/websocket-client.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/tests/file-downloader.cpp"
 )
 add_executable(network-monitor-tests ${TESTS_SOURCES})
 target_compile_features(network-monitor-tests

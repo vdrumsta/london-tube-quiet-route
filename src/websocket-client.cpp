@@ -6,6 +6,7 @@
 #include <boost/system/error_code.hpp>
 
 #include <openssl/ssl.h>
+#include <cpr/cpr.h>
 
 #include <chrono>
 #include <functional>
