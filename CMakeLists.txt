@@ -31,6 +31,7 @@ endif()
 set(LIB_SOURCES
     "${CMAKE_CURRENT_SOURCE_DIR}/src/websocket-client.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/file-downloader.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/transport-network.cpp"
 )
 add_library(network-monitor STATIC ${LIB_SOURCES})
 target_compile_features(network-monitor
@@ -59,6 +60,7 @@ set(TESTS_SOURCES
     "${CMAKE_CURRENT_SOURCE_DIR}/tests/main.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/tests/websocket-client.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/tests/file-downloader.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/tests/transport-network.cpp"
 )
 add_executable(network-monitor-tests ${TESTS_SOURCES})
 target_compile_features(network-monitor-tests
