@@ -76,134 +76,134 @@ BOOST_AUTO_TEST_SUITE(AddLine);
 
 BOOST_AUTO_TEST_CASE(basic)
 {
-    // TransportNetwork nw {};
-    // bool ok {false};
+    TransportNetwork nw {};
+    bool ok {false};
 
-    // // Add a line with 1 route.
-    // // route0: 0 ---> 1
+    // Add a line with 1 route.
+    // route0: 0 ---> 1
 
-    // // First, add the stations.
-    // Station station0 {
-    //     "station_000",
-    //     "Station Name 0",
-    // };
-    // Station station1 {
-    //     "station_001",
-    //     "Station Name 1",
-    // };
-    // ok = true;
-    // ok &= nw.AddStation(station0);
-    // ok &= nw.AddStation(station1);
-    // BOOST_REQUIRE(ok);
+    // First, add the stations.
+    Station station0 {
+        "station_000",
+        "Station Name 0",
+    };
+    Station station1 {
+        "station_001",
+        "Station Name 1",
+    };
+    ok = true;
+    ok &= nw.AddStation(station0);
+    ok &= nw.AddStation(station1);
+    BOOST_REQUIRE(ok);
 
-    // // Then, add the line, with the two routes.
-    // Route route0 {
-    //     "route_000",
-    //     "inbound",
-    //     "line_000",
-    //     "station_000",
-    //     "station_001",
-    //     {"station_000", "station_001"},
-    // };
-    // Line line {
-    //     "line_000",
-    //     "Line Name",
-    //     {route0},
-    // };
-    // ok = nw.AddLine(line);
-    // BOOST_CHECK(ok);
+    // Then, add the line, with the two routes.
+    Route route0 {
+        "route_000",
+        "inbound",
+        "line_000",
+        "station_000",
+        "station_001",
+        {"station_000", "station_001"},
+    };
+    Line line {
+        "line_000",
+        "Line Name",
+        {route0},
+    };
+    ok = nw.AddLine(line);
+    BOOST_CHECK(ok);
 }
 
 BOOST_AUTO_TEST_CASE(shared_stations)
 {
-    // TransportNetwork nw {};
-    // bool ok {false};
+    TransportNetwork nw {};
+    bool ok {false};
 
-    // // Define a line with 2 routes going through some shared stations.
-    // // route0: 0 ---> 1 ---> 2
-    // // route1: 3 ---> 1 ---> 2
-    // Station station0 {
-    //     "station_000",
-    //     "Station Name 0",
-    // };
-    // Station station1 {
-    //     "station_001",
-    //     "Station Name 1",
-    // };
-    // Station station2 {
-    //     "station_002",
-    //     "Station Name 2",
-    // };
-    // Station station3 {
-    //     "station_003",
-    //     "Station Name 3",
-    // };
-    // Route route0 {
-    //     "route_000",
-    //     "inbound",
-    //     "line_000",
-    //     "station_000",
-    //     "station_002",
-    //     {"station_000", "station_001", "station_002"},
-    // };
-    // Route route1 {
-    //     "route_001",
-    //     "inbound",
-    //     "line_000",
-    //     "station_003",
-    //     "station_002",
-    //     {"station_003", "station_001", "station_002"},
-    // };
-    // Line line {
-    //     "line_000",
-    //     "Line Name",
-    //     {route0, route1},
-    // };
-    // ok = true;
-    // ok &= nw.AddStation(station0);
-    // ok &= nw.AddStation(station1);
-    // ok &= nw.AddStation(station2);
-    // ok &= nw.AddStation(station3);
-    // BOOST_REQUIRE(ok);
-    // ok = nw.AddLine(line);
-    // BOOST_CHECK(ok);
+    // Define a line with 2 routes going through some shared stations.
+    // route0: 0 ---> 1 ---> 2
+    // route1: 3 ---> 1 ---> 2
+    Station station0 {
+        "station_000",
+        "Station Name 0",
+    };
+    Station station1 {
+        "station_001",
+        "Station Name 1",
+    };
+    Station station2 {
+        "station_002",
+        "Station Name 2",
+    };
+    Station station3 {
+        "station_003",
+        "Station Name 3",
+    };
+    Route route0 {
+        "route_000",
+        "inbound",
+        "line_000",
+        "station_000",
+        "station_002",
+        {"station_000", "station_001", "station_002"},
+    };
+    Route route1 {
+        "route_001",
+        "inbound",
+        "line_000",
+        "station_003",
+        "station_002",
+        {"station_003", "station_001", "station_002"},
+    };
+    Line line {
+        "line_000",
+        "Line Name",
+        {route0, route1},
+    };
+    ok = true;
+    ok &= nw.AddStation(station0);
+    ok &= nw.AddStation(station1);
+    ok &= nw.AddStation(station2);
+    ok &= nw.AddStation(station3);
+    BOOST_REQUIRE(ok);
+    ok = nw.AddLine(line);
+    BOOST_CHECK(ok);
 }
 
 BOOST_AUTO_TEST_CASE(duplicate)
 {
-    // TransportNetwork nw {};
-    // bool ok {false};
+    TransportNetwork nw {};
+    bool ok {false};
 
-    // // Can't add the same line twice.
-    // Station station0 {
-    //     "station_000",
-    //     "Station Name 0",
-    // };
-    // Station station1 {
-    //     "station_001",
-    //     "Station Name 1",
-    // };
-    // Route route0 {
-    //     "route_000",
-    //     "inbound",
-    //     "line_000",
-    //     "station_000",
-    //     "station_001",
-    //     {"station_000", "station_001"},
-    // };
-    // Line line {
-    //     "line_000",
-    //     "Line Name",
-    //     {route0},
-    // };
-    // ok = true;
-    // ok &= nw.AddStation(station0);
-    // ok &= nw.AddStation(station1);
-    // BOOST_REQUIRE(ok);
-    // ok = nw.AddLine(line);
-    // BOOST_REQUIRE(ok);
-    // ok = nw.AddLine(line);
-    // BOOST_CHECK(!ok);
+    // Can't add the same line twice.
+    Station station0 {
+        "station_000",
+        "Station Name 0",
+    };
+    Station station1 {
+        "station_001",
+        "Station Name 1",
+    };
+    Route route0 {
+        "route_000",
+        "inbound",
+        "line_000",
+        "station_000",
+        "station_001",
+        {"station_000", "station_001"},
+    };
+    Line line {
+        "line_000",
+        "Line Name",
+        {route0},
+    };
+    ok = true;
+    ok &= nw.AddStation(station0);
+    ok &= nw.AddStation(station1);
+    BOOST_REQUIRE(ok);
+    ok = nw.AddLine(line);
+    BOOST_REQUIRE(ok);
+    ok = nw.AddLine(line);
+    BOOST_CHECK(!ok);
 }
 
 BOOST_AUTO_TEST_SUITE_END(); // AddLine

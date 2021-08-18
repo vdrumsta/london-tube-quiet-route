@@ -101,18 +101,18 @@ struct GraphNode;
  *  Graph edge connects to a graph node
  */
 struct GraphEdge {
-    Line line;
-    std::vector<Route> routes{};
-    GraphNode& nextNode;
+    std::vector<Id> routeIds{}; 
+    GraphNode* nextNode;
+    const unsigned int travelTime;
 };
 
 /*! \brief Graph node of a station
  *
  */
 struct GraphNode {
-    Station& station;
+    const Station& station;
+    std::map<Id, GraphEdge*> edges {};   // map<station id, GraphEdge*>
     int passengerCount {};
-    std::vector<GraphEdge> edges {};
 };
 
 public:
@@ -262,7 +262,24 @@ public:
 
 private:
     std::vector<const Station*> stations_ {};
-    std::map<Id,GraphNode> stationGraph_;
+    std::vector<const Line*> lines_ {};
+    std::vector<const Route*> routes_ {};
+    std::map<Id,GraphNode*> stationGraph_;
+
+    /*! \brief Add a route to all station on the route.
+     *
+     *  \returns false if there was an error while adding the route to the
+     *           stations' edges.
+     */
+    void AddRoute(
+        const Route& route
+    );
+
+    /*! \brief Add a graph edge from station A to station B */
+    bool AddEdge(
+        const Id& stationA,
+        const Id& stationB
+    );
 };
 
 } // namespace NetworkMonitor
