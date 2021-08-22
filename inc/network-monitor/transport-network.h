@@ -101,9 +101,14 @@ struct GraphNode;
  *  Graph edge connects to a graph node
  */
 struct GraphEdge {
+    enum class Direction {
+        Inbound,
+        Outbound
+    };
+
     std::vector<Id> routeIds{}; 
     GraphNode* nextNode;
-    const unsigned int travelTime;
+    unsigned int travelTime;
 };
 
 /*! \brief Graph node of a station
@@ -111,8 +116,9 @@ struct GraphEdge {
  */
 struct GraphNode {
     const Station& station;
-    std::map<Id, GraphEdge*> edges {};   // map<station id, GraphEdge*>
-    int passengerCount {};
+    std::map<Id, GraphEdge*> outboundEdges {};
+    std::map<Id, GraphEdge*> inboundEdges {};
+    long long int passengerCount {};
 };
 
 public:
@@ -194,7 +200,7 @@ public:
      */
     long long int GetPassengerCount(
         const Id& station
-    ) const;
+    );
 
     /*! \brief Get list of routes serving a given station.
      *
@@ -206,7 +212,7 @@ public:
      */
     std::vector<Id> GetRoutesServingStation(
         const Id& station
-    ) const;
+    );
 
     /*! \brief Set the travel time between 2 adjacent stations.
      *
@@ -239,7 +245,7 @@ public:
     unsigned int GetTravelTime(
         const Id& stationA,
         const Id& stationB
-    ) const;
+    );
 
     /*! \brief Get the total travel time between any 2 stations, on a specific
      *         route.
@@ -264,19 +270,38 @@ private:
     std::vector<const Station*> stations_ {};
     std::vector<const Line*> lines_ {};
     std::vector<const Route*> routes_ {};
-    std::map<Id,GraphNode*> stationGraph_;
+    std::map<const Id, GraphNode*> stationGraph_;
 
-    /*! \brief Add a route to all station on the route.
-     *
-     *  \returns false if there was an error while adding the route to the
-     *           stations' edges.
-     */
+    /*! \brief Add a route to all station on the route*/
     void AddRoute(
         const Route& route
     );
 
     /*! \brief Add a graph edge from station A to station B */
-    bool AddEdge(
+    void AddEdge(
+        const Id& stationA,
+        const Id& stationB,
+        const Id& routeId,
+        const GraphEdge::Direction& direction
+    );
+
+    /*! \brief Get an edge between from station A to station B with a specified direction
+    *
+    *   \return null if edge doesn't exist, if it does, return the edge
+    * 
+    */
+    GraphEdge* GetEdge(
+        const Id& stationA,
+        const Id& stationB,
+        const GraphEdge::Direction& direction
+    );
+
+    /*! \brief Check if an edge exists between 2 stations
+    *
+    *   \return true if an edge exists
+    * 
+    */
+    bool IsEdgeExists(
         const Id& stationA,
         const Id& stationB
     );

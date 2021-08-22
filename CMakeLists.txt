@@ -36,7 +36,7 @@ set(LIB_SOURCES
 add_library(network-monitor STATIC ${LIB_SOURCES})
 target_compile_features(network-monitor
     PUBLIC
-        cxx_std_17
+        cxx_std_20
 )
 target_compile_definitions(network-monitor
     PRIVATE
