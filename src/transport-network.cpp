@@ -43,24 +43,23 @@ TransportNetwork::~TransportNetwork() {}
 bool TransportNetwork::AddStation(const Station& station)
 {
     // Check we're not adding a station with the same id
-    pointer_values_equal<Station> station_ptr_finder { &station };
-    if ( std::find_if(stations_.begin(), stations_.end(), station_ptr_finder) != stations_.end() )
-    {
-        return false;
-    }
+    if ( stations_.find(station.id) != stations_.end() ) return false;
 
-    stations_.push_back(&station);
     // TODO: Update this to use a shared ptr
     GraphNode* stationNode = new GraphNode{station, std::map<Id, GraphEdge*> {}, {}, 0};
-    stationGraph_.insert(std::pair<Id, GraphNode*>{station.id, stationNode});
+    stations_.insert(std::pair<Id, GraphNode*>{station.id, stationNode});
     return true;
 }
 
 bool TransportNetwork::AddLine(const Line& line)
 {
-    // Check we're not adding a line with the same id
-    pointer_values_equal<Line> line_ptr_finder { &line };
-    if ( std::find_if(lines_.begin(), lines_.end(), line_ptr_finder) != lines_.end() )
+    if ( lines_.find(line.id) != lines_.end() ) return false;
+    
+    // // Check all stations are in the network
+    if ( std::none_of(line.routes.begin(),
+                        line.routes.end(),
+                        [&](const Route& route){
+                            return IsRouteStopsExist(route);}) )
     {
         return false;
     }
@@ -75,14 +74,12 @@ bool TransportNetwork::AddLine(const Line& line)
         AddRoute(route);
     }
     
-    lines_.push_back(&line);
+    lines_[line.id] = &line;
     return true;
- }
+}
 
 void TransportNetwork::AddRoute(const Route& route)
 {
-    routes_[route.id] = &route;
-
     for (int stopIndex = 0; stopIndex < route.stops.size() - 1; ++stopIndex)
     {
         const Id& currentStop = route.stops[stopIndex];
@@ -90,6 +87,8 @@ void TransportNetwork::AddRoute(const Route& route)
         AddEdge(currentStop, nextStop, route.id, GraphEdge::Direction::Outbound);
         AddEdge(nextStop, currentStop, route.id, GraphEdge::Direction::Inbound);
     }
+
+    routes_[route.id] = &route;
 }
 
 void TransportNetwork::AddEdge(
@@ -102,17 +101,17 @@ void TransportNetwork::AddEdge(
     std::map<Id, GraphEdge*> edges;
     if (direction == GraphEdge::Direction::Inbound)
     {
-        edges = stationGraph_[stationA]->inboundEdges;
+        edges = stations_[stationA]->inboundEdges;
     }
     {
-        edges = stationGraph_[stationA]->outboundEdges;
+        edges = stations_[stationA]->outboundEdges;
     }
 
     if (edges.find(stationB) == edges.end())
     {
         GraphEdge* newEdge = new GraphEdge{
             std::vector<Id>{ routeId },
-            stationGraph_[stationB],
+            stations_[stationB],
             0,  // travelTime
         };
         edges[stationB] = newEdge;
@@ -125,39 +124,39 @@ void TransportNetwork::AddEdge(
     //
     if (direction == GraphEdge::Direction::Inbound)
     {
-        stationGraph_[stationA]->inboundEdges = edges;
+        stations_[stationA]->inboundEdges = edges;
     }
     {
-        stationGraph_[stationA]->outboundEdges = edges;
+        stations_[stationA]->outboundEdges = edges;
     }
 }
 
 long long int TransportNetwork::GetPassengerCount(const Id& station)
 {
-    if (stationGraph_.find(station) == stationGraph_.end())
+    if (stations_.find(station) == stations_.end())
     {
         throw std::runtime_error("Station " + station + " not found.");
     }
     
-    return stationGraph_[station]->passengerCount;
+    return stations_[station]->passengerCount;
 }
 
 bool TransportNetwork::RecordPassengerEvent(const PassengerEvent& event)
 {
-    if (stationGraph_.find(event.stationId) == stationGraph_.end())
+    if (stations_.find(event.stationId) == stations_.end())
         return false;
     if (event.type != PassengerEvent::Type::In and event.type != PassengerEvent::Type::Out)
         return false;
 
     int passengerNum = event.type == PassengerEvent::Type::In ? 1 : -1;
-    stationGraph_[event.stationId]->passengerCount += passengerNum;
+    stations_[event.stationId]->passengerCount += passengerNum;
     return true;
 }
 
 std::vector<Id> TransportNetwork::GetRoutesServingStation(const Id& station)
 {
     std::vector<Id> routeIds{};
-    const auto outboundEdges = stationGraph_[station]->outboundEdges;
+    const auto outboundEdges = stations_[station]->outboundEdges;
     for (const auto& [stationKey, edge] : outboundEdges)
     {
         for (const auto& routeId : edge->routeIds)
@@ -177,14 +176,14 @@ unsigned int TransportNetwork::GetTravelTime(const Id& stationA, const Id& stati
     if (stationA == stationB) return 0;
 
     // Check outbound edges
-    auto& stationAOutEdges = stationGraph_[stationA]->outboundEdges;
+    auto& stationAOutEdges = stations_[stationA]->outboundEdges;
     if (stationAOutEdges.find(stationB) != stationAOutEdges.end())
     {
         return stationAOutEdges[stationB]->travelTime;
     }
 
     // Check inbound edges
-    auto& stationAInEdges = stationGraph_[stationA]->inboundEdges;
+    auto& stationAInEdges = stations_[stationA]->inboundEdges;
     if (stationAInEdges.find(stationB) != stationAInEdges.end())
     {
         return stationAInEdges[stationB]->travelTime;
@@ -269,7 +268,7 @@ TransportNetwork::GraphEdge* TransportNetwork::GetEdge(
 {
     if (direction == GraphEdge::Direction::Inbound)
     {
-        auto& inboundEdges = stationGraph_[stationA]->inboundEdges;
+        auto& inboundEdges = stations_[stationA]->inboundEdges;
         if (inboundEdges.find(stationB) == inboundEdges.end())
         {
             return nullptr;
@@ -281,7 +280,7 @@ TransportNetwork::GraphEdge* TransportNetwork::GetEdge(
     }
     else
     {
-        auto& outboundEdges = stationGraph_[stationA]->outboundEdges;
+        auto& outboundEdges = stations_[stationA]->outboundEdges;
         if (outboundEdges.find(stationB) == outboundEdges.end())
         {
             return nullptr;
@@ -298,9 +297,18 @@ bool TransportNetwork::IsEdgeExists(
     const Id& stationB
 )
 {
-    auto& inboundEdges = stationGraph_[stationA]->inboundEdges;
-    auto& outboundEdges = stationGraph_[stationA]->outboundEdges;
+    auto& inboundEdges = stations_[stationA]->inboundEdges;
+    auto& outboundEdges = stations_[stationA]->outboundEdges;
 
     return inboundEdges.find(stationB) != inboundEdges.end()
             or outboundEdges.find(stationB) != outboundEdges.end();
+}
+
+bool TransportNetwork::IsRouteStopsExist(const Route& route)
+{
+    return std::all_of(route.stops.begin(),
+                        route.stops.end(),
+                        [&](const Id& stop){
+                            return stations_.find(stop) != stations_.end();
+                        });
 }

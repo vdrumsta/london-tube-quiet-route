@@ -267,10 +267,9 @@ public:
     );
 
 private:
-    std::vector<const Station*> stations_ {};
-    std::vector<const Line*> lines_ {};
+    std::map<const Id, const Line*> lines_ {};
     std::map<const Id, const Route*> routes_ {};
-    std::map<const Id, GraphNode*> stationGraph_;
+    std::map<const Id, GraphNode*> stations_;
 
     /*! \brief Add a route to all station on the route*/
     void AddRoute(
@@ -302,6 +301,20 @@ private:
     * 
     */
     bool IsEdgeExists(
+        const Id& stationA,
+        const Id& stationB
+    );
+
+    /*! \brief Check if all stations in a route exist
+    *
+    *   \return true if all stops in a route are present in stations_
+    * 
+    */
+    bool IsRouteStopsExist(
+        const Route& route
+    );
+
+    bool IsEdgesExists(
         const Id& stationA,
         const Id& stationB
     );
