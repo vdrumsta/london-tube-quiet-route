@@ -264,12 +264,12 @@ public:
         const Id& route,
         const Id& stationA,
         const Id& stationB
-    ) const;
+    );
 
 private:
     std::vector<const Station*> stations_ {};
     std::vector<const Line*> lines_ {};
-    std::vector<const Route*> routes_ {};
+    std::map<const Id, const Route*> routes_ {};
     std::map<const Id, GraphNode*> stationGraph_;
 
     /*! \brief Add a route to all station on the route*/
@@ -304,6 +304,34 @@ private:
     bool IsEdgeExists(
         const Id& stationA,
         const Id& stationB
+    );
+
+    /*! \brief Get a number which tells which stop on a route a station is
+    *
+    *   \return number of the stop of a station on route.
+    *   0 if it doesn't exist on route
+    * 
+    */
+    int GetStopNumberOnRoute(
+        const Id& stationId,
+        const Id& route
+    );
+
+    /*! \brief Get a graph direction between stops
+    *   
+    *   Prerequisite is that the station graph must be constructed correctly
+    *
+    *   e.g.    On a route station A -> station B -> station C
+    *           the station A, station C direction would be Outbound.
+    *           On the same route, station C, station B direction would be Inbound.
+    *   
+    *   \return Direction between 2 stations on a route
+    * 
+    */
+    GraphEdge::Direction GetDirectionBetweenStops(
+        const Id& stationA,
+        const Id& stationB,
+        const Id& route
     );
 };
 

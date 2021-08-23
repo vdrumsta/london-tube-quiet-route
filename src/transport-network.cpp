@@ -65,24 +65,24 @@ bool TransportNetwork::AddLine(const Line& line)
         return false;
     }
 
-    for (const auto route : line.routes)
+    for (auto& route : line.routes)
     {
         // Check we're not adding a route with the same id
-        pointer_values_equal<Route> route_ptr_finder { &route };
-        if ( std::find_if(routes_.begin(), routes_.end(), route_ptr_finder) != routes_.end() )
+        if ( routes_.find(route.id) != routes_.end() )
         {
             continue;
         }
-        routes_.push_back(&route);
         AddRoute(route);
     }
     
     lines_.push_back(&line);
     return true;
-}
+ }
 
 void TransportNetwork::AddRoute(const Route& route)
 {
+    routes_[route.id] = &route;
+
     for (int stopIndex = 0; stopIndex < route.stops.size() - 1; ++stopIndex)
     {
         const Id& currentStop = route.stops[stopIndex];
@@ -191,6 +191,57 @@ unsigned int TransportNetwork::GetTravelTime(const Id& stationA, const Id& stati
     }
 
     return 0;
+}
+
+unsigned int TransportNetwork::GetTravelTime(
+    const Id& line,
+    const Id& route,
+    const Id& stationA,
+    const Id& stationB
+)
+{
+    if (stationA == stationB) return 0;
+    
+    int travelTimeSum{0};
+    auto stopDirection = GetDirectionBetweenStops(stationA, stationB, route);
+    if (stopDirection == GraphEdge::Direction::Outbound)
+    {
+        auto routeObj = routes_[route];
+        auto currentStopItr = std::find(routeObj->stops.begin(), routeObj->stops.end(), stationA);
+        auto stopEndItr = std::find(routeObj->stops.begin(), routeObj->stops.end(), stationB);
+
+        for (; currentStopItr != stopEndItr; ++currentStopItr)
+        {
+            auto nextStopId = *(std::next(currentStopItr));
+            travelTimeSum += GetTravelTime(*(currentStopItr), nextStopId);
+        }
+    }
+
+    return travelTimeSum;
+}
+
+int TransportNetwork::GetStopNumberOnRoute(const Id& stationId, const Id& route)
+{
+    auto routeStops = routes_[route]->stops;
+    auto stopItr = std::find(routeStops.begin(), routeStops.end(), stationId);
+    if (stopItr == routeStops.end())
+    {
+        return 0;   // Stop is not on route
+    }
+
+    return std::distance(routeStops.begin(), stopItr);
+}
+
+TransportNetwork::GraphEdge::Direction TransportNetwork::GetDirectionBetweenStops(
+    const Id& stationA,
+    const Id& stationB,
+    const Id& route
+)
+{
+    int stopANumber = GetStopNumberOnRoute(stationA, route);
+    int stopBNumber = GetStopNumberOnRoute(stationB, route);
+
+    return stopANumber - stopBNumber > 0 ? GraphEdge::Direction::Inbound : GraphEdge::Direction::Outbound;
 }
 
 bool TransportNetwork::SetTravelTime(const Id& stationA, const Id& stationB, const unsigned int travelTime)
