@@ -6,21 +6,6 @@
 using NetworkMonitor::TransportNetwork;
 using Id = std::string;
 
-namespace
-{
-    // Helper function for finding pointer objects in a vector
-    template <typename T>
-    struct pointer_values_equal
-    {
-        const T* to_find;
-
-        bool operator()(const T* other) const
-        {
-            return *to_find == *other;
-        }
-    };
-}
-
 bool NetworkMonitor::Station::operator== (const Station& other) const
 {
     return id == other.id;
@@ -45,9 +30,8 @@ bool TransportNetwork::AddStation(const Station& station)
     // Check we're not adding a station with the same id
     if ( stations_.find(station.id) != stations_.end() ) return false;
 
-    // TODO: Update this to use a shared ptr
-    GraphNode* stationNode = new GraphNode{station, std::map<Id, GraphEdge*> {}, {}, 0};
-    stations_.insert(std::pair<Id, GraphNode*>{station.id, stationNode});
+    std::shared_ptr<GraphNode> stationNode{new GraphNode{station, std::map<Id, std::shared_ptr<GraphEdge>> {}, {}, 0}};
+    stations_.insert(std::pair<Id, std::shared_ptr<GraphNode>>{station.id, stationNode});
     return true;
 }
 
@@ -55,7 +39,7 @@ bool TransportNetwork::AddLine(const Line& line)
 {
     if ( lines_.find(line.id) != lines_.end() ) return false;
     
-    // // Check all stations are in the network
+    // Check all stations are in the network
     if ( std::none_of(line.routes.begin(),
                         line.routes.end(),
                         [&](const Route& route){
@@ -64,22 +48,36 @@ bool TransportNetwork::AddLine(const Line& line)
         return false;
     }
 
+    lines_[line.id] = std::make_shared<LineInternal>(LineInternal{
+        line.id,
+        line.name,
+        {}  // std::map<Id, std::shared_ptr<RouteInternal>> routes
+    });
+
     for (auto& route : line.routes)
     {
         // Check we're not adding a route with the same id
         if ( routes_.find(route.id) != routes_.end() )
         {
-            continue;
+            return false;
         }
-        AddRoute(route);
+        AddRouteToLine(route, lines_[line.id]);
     }
     
-    lines_[line.id] = &line;
     return true;
 }
 
-void TransportNetwork::AddRoute(const Route& route)
+void TransportNetwork::AddRouteToLine(const Route& route, std::shared_ptr<LineInternal>& line)
 {
+    // Construct a vector of station nodes
+    std::vector<std::shared_ptr<GraphNode>> routeStops {};
+    for (const auto& stop : route.stops)
+    {
+        // TODO: see if you can use transform for this
+        routeStops.push_back(stations_[stop]);
+    }
+
+    // Construct edges between station nodes
     for (int stopIndex = 0; stopIndex < route.stops.size() - 1; ++stopIndex)
     {
         const Id& currentStop = route.stops[stopIndex];
@@ -88,9 +86,14 @@ void TransportNetwork::AddRoute(const Route& route)
         AddEdge(nextStop, currentStop, route.id, GraphEdge::Direction::Inbound);
     }
 
-    routes_[route.id] = &route;
+    routes_[route.id] = std::make_shared<RouteInternal>(RouteInternal{
+        route.id,
+        line,
+        routeStops
+    });
 }
 
+// TODO: Refactor this to do inbound and outbound addition of edges in 1 go
 void TransportNetwork::AddEdge(
     const Id& stationA,
     const Id& stationB,
@@ -98,22 +101,23 @@ void TransportNetwork::AddEdge(
     const GraphEdge::Direction& direction
 )
 {
-    std::map<Id, GraphEdge*> edges;
+    std::map<Id, std::shared_ptr<GraphEdge>> edges;
     if (direction == GraphEdge::Direction::Inbound)
     {
         edges = stations_[stationA]->inboundEdges;
     }
+    else
     {
         edges = stations_[stationA]->outboundEdges;
     }
 
     if (edges.find(stationB) == edges.end())
     {
-        GraphEdge* newEdge = new GraphEdge{
+        std::shared_ptr<GraphEdge> newEdge{new GraphEdge{
             std::vector<Id>{ routeId },
             stations_[stationB],
             0,  // travelTime
-        };
+        }};
         edges[stationB] = newEdge;
     }
     else
@@ -260,7 +264,7 @@ bool TransportNetwork::SetTravelTime(const Id& stationA, const Id& stationB, con
     return true;
 }
 
-TransportNetwork::GraphEdge* TransportNetwork::GetEdge(
+std::shared_ptr<TransportNetwork::GraphEdge> TransportNetwork::GetEdge(
         const Id& stationA,
         const Id& stationB,
         const GraphEdge::Direction& direction

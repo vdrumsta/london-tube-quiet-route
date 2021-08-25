@@ -1,6 +1,7 @@
 #include <string>
 #include <vector>
 #include <map>
+#include <memory>
 
 namespace NetworkMonitor {
 
@@ -93,33 +94,6 @@ struct PassengerEvent {
 /*! \brief Underground network representation
  */
 class TransportNetwork {
-
-struct GraphNode;
-
-/*! \brief Graph edge
- *
- *  Graph edge connects to a graph node
- */
-struct GraphEdge {
-    enum class Direction {
-        Inbound,
-        Outbound
-    };
-
-    std::vector<Id> routeIds{}; 
-    GraphNode* nextNode;
-    unsigned int travelTime;
-};
-
-/*! \brief Graph node of a station
- *
- */
-struct GraphNode {
-    const Station& station;
-    std::map<Id, GraphEdge*> outboundEdges {};
-    std::map<Id, GraphEdge*> inboundEdges {};
-    long long int passengerCount {};
-};
 
 public:
     /*! \brief Default constructor
@@ -267,13 +241,58 @@ public:
     );
 
 private:
-    std::map<const Id, const Line*> lines_ {};
-    std::map<const Id, const Route*> routes_ {};
-    std::map<const Id, GraphNode*> stations_;
+    // forward declaration
+    struct LineInternal;
+    struct GraphNode;
+
+    /*! \brief Graph edge
+    *
+    *  Graph edge connects to a graph node
+    */
+    struct GraphEdge {
+        enum class Direction {
+            Inbound,
+            Outbound
+        };
+
+        std::vector<Id> routeIds{}; 
+        std::shared_ptr<GraphNode> nextNode;
+        unsigned int travelTime;
+    };
+
+    /*! \brief Graph node of a station
+    *
+    */
+    struct GraphNode {
+        const Station& station;
+        std::map<Id, std::shared_ptr<GraphEdge>> outboundEdges {};
+        std::map<Id, std::shared_ptr<GraphEdge>> inboundEdges {};
+        long long int passengerCount {};
+    };
+
+    // Internal route representation
+    struct RouteInternal {
+        Id id {};
+        std::shared_ptr<LineInternal> line {nullptr};
+        std::vector<std::shared_ptr<GraphNode>> stops {};
+    };
+
+    // Internal line representation
+    // We map line routes by their ID.
+    struct LineInternal {
+        Id id {};
+        std::string name {};
+        std::map<Id, std::shared_ptr<RouteInternal>> routes {};
+    };
+
+    std::map<const Id, std::shared_ptr<LineInternal>> lines_ {};
+    std::map<const Id, std::shared_ptr<RouteInternal>> routes_ {};
+    std::map<const Id, std::shared_ptr<GraphNode>> stations_;
 
     /*! \brief Add a route to all station on the route*/
-    void AddRoute(
-        const Route& route
+    void AddRouteToLine(
+        const Route& route,
+        std::shared_ptr<LineInternal>& line
     );
 
     /*! \brief Add a graph edge from station A to station B */
@@ -289,7 +308,7 @@ private:
     *   \return null if edge doesn't exist, if it does, return the edge
     * 
     */
-    GraphEdge* GetEdge(
+    std::shared_ptr<GraphEdge> GetEdge(
         const Id& stationA,
         const Id& stationB,
         const GraphEdge::Direction& direction
