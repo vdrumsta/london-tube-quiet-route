@@ -83,11 +83,9 @@ void TransportNetwork::AddRouteToLine(const Route& route, std::shared_ptr<LineIn
 {
     // Construct a vector of station nodes
     std::vector<std::shared_ptr<GraphNode>> routeStops {};
-    for (const auto& stop : route.stops)
-    {
-        // TODO: see if you can use transform for this
-        routeStops.push_back(stations_[stop]);
-    }
+    std::transform(route.stops.begin(), route.stops.end(), std::back_inserter(routeStops), [&](auto& stop){
+        return stations_[stop];
+    });
 
     // Construct edges between station nodes
     for (int stopIndex = 0; stopIndex < route.stops.size() - 1; ++stopIndex)
@@ -145,7 +143,7 @@ long long int TransportNetwork::GetPassengerCount(const Id& station)
         throw std::runtime_error("Station " + station + " not found.");
     }
 
-    return stations_.[station]->passengerCount;
+    return stations_[station]->passengerCount;
 }
 
 bool TransportNetwork::RecordPassengerEvent(const PassengerEvent& event)
