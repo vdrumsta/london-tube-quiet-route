@@ -255,7 +255,7 @@ private:
             Outbound
         };
 
-        std::vector<Id> routeIds{}; 
+        std::vector<Id> routeIds{};
         std::shared_ptr<GraphNode> nextNode;
         unsigned int travelTime;
     };
@@ -299,8 +299,14 @@ private:
     void AddEdge(
         const Id& stationA,
         const Id& stationB,
-        const Id& routeId,
-        const GraphEdge::Direction& direction
+        const Id& routeId
+    );
+
+    /*! \brief Add route to an existing edge or if one already exists make a new one */
+    void AddRouteToEdge(
+        std::map<Id, std::shared_ptr<GraphEdge>>& edges,
+        const Id& stationId,
+        const Id& routeId
     );
 
     /*! \brief Get an edge between from station A to station B with a specified direction
@@ -364,6 +370,12 @@ private:
         const Id& stationA,
         const Id& stationB,
         const Id& route
+    );
+
+    /*! \brief Find unique routes in a map of edges and add them to a vector */
+    void AddUniqueEdgeRoutes(
+        const std::map<Id, std::shared_ptr<GraphEdge>>& edges,
+        std::vector<Id>& oFoundRoutes
     );
 };
 

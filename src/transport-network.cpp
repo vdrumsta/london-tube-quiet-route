@@ -82,8 +82,7 @@ void TransportNetwork::AddRouteToLine(const Route& route, std::shared_ptr<LineIn
     {
         const Id& currentStop = route.stops[stopIndex];
         const Id& nextStop = route.stops[stopIndex + 1];
-        AddEdge(currentStop, nextStop, route.id, GraphEdge::Direction::Outbound);
-        AddEdge(nextStop, currentStop, route.id, GraphEdge::Direction::Inbound);
+        AddEdge(currentStop, nextStop, route.id);
     }
 
     routes_[route.id] = std::make_shared<RouteInternal>(RouteInternal{
@@ -93,45 +92,37 @@ void TransportNetwork::AddRouteToLine(const Route& route, std::shared_ptr<LineIn
     });
 }
 
-// TODO: Refactor this to do inbound and outbound addition of edges in 1 go
 void TransportNetwork::AddEdge(
     const Id& stationA,
     const Id& stationB,
-    const Id& routeId,
-    const GraphEdge::Direction& direction
+    const Id& routeId
 )
 {
-    std::map<Id, std::shared_ptr<GraphEdge>> edges;
-    if (direction == GraphEdge::Direction::Inbound)
-    {
-        edges = stations_[stationA]->inboundEdges;
-    }
-    else
-    {
-        edges = stations_[stationA]->outboundEdges;
-    }
+    auto& stationAOutboundEdges = stations_[stationA]->outboundEdges;
+    auto& stationBInboundEdges = stations_[stationB]->inboundEdges;
 
-    if (edges.find(stationB) == edges.end())
+    AddRouteToEdge(stationAOutboundEdges, stationB, routeId);
+    AddRouteToEdge(stationBInboundEdges, stationA, routeId);
+}
+
+void TransportNetwork::AddRouteToEdge(
+    std::map<Id, std::shared_ptr<GraphEdge>>& edges,
+    const Id& stationId,
+    const Id& routeId
+)
+{
+    if (edges.find(stationId) == edges.end())
     {
         std::shared_ptr<GraphEdge> newEdge{new GraphEdge{
             std::vector<Id>{ routeId },
-            stations_[stationB],
+            stations_[stationId],
             0,  // travelTime
         }};
-        edges[stationB] = newEdge;
+        edges[stationId] = newEdge;
     }
     else
     {
-        edges[stationB]->routeIds.push_back(routeId);
-    }
-
-    //
-    if (direction == GraphEdge::Direction::Inbound)
-    {
-        stations_[stationA]->inboundEdges = edges;
-    }
-    {
-        stations_[stationA]->outboundEdges = edges;
+        edges[stationId]->routeIds.push_back(routeId);
     }
 }
 
@@ -159,20 +150,31 @@ bool TransportNetwork::RecordPassengerEvent(const PassengerEvent& event)
 
 std::vector<Id> TransportNetwork::GetRoutesServingStation(const Id& station)
 {
-    std::vector<Id> routeIds{};
-    const auto outboundEdges = stations_[station]->outboundEdges;
-    for (const auto& [stationKey, edge] : outboundEdges)
+    std::vector<Id> foundRouteIds{};
+    const auto& outboundEdges = stations_[station]->outboundEdges;
+    const auto& inboundEdges = stations_[station]->inboundEdges;
+
+    AddUniqueEdgeRoutes(outboundEdges, foundRouteIds);
+    AddUniqueEdgeRoutes(inboundEdges, foundRouteIds);
+    
+    return foundRouteIds;
+}
+
+void TransportNetwork::AddUniqueEdgeRoutes(
+    const std::map<Id, std::shared_ptr<GraphEdge>>& edges,
+    std::vector<Id>& oFoundRoutes
+)
+{
+    for (const auto& [stationKey, edge] : edges)
     {
         for (const auto& routeId : edge->routeIds)
         {
-            if (std::find(routeIds.begin(), routeIds.end(), routeId) == routeIds.end())
+            if (std::find(oFoundRoutes.begin(), oFoundRoutes.end(), routeId) == oFoundRoutes.end())
             {
-                routeIds.push_back(routeId);
+                oFoundRoutes.push_back(routeId);
             }
         }
     }
-
-    return routeIds;
 }
 
 unsigned int TransportNetwork::GetTravelTime(const Id& stationA, const Id& stationB)
@@ -209,14 +211,18 @@ unsigned int TransportNetwork::GetTravelTime(
     auto stopDirection = GetDirectionBetweenStops(stationA, stationB, route);
     if (stopDirection == GraphEdge::Direction::Outbound)
     {
+        auto stationANode = stations_[stationA];
+        auto stationBNode = stations_[stationB];
         auto routeObj = routes_[route];
-        auto currentStopItr = std::find(routeObj->stops.begin(), routeObj->stops.end(), stationA);
-        auto stopEndItr = std::find(routeObj->stops.begin(), routeObj->stops.end(), stationB);
+
+        auto currentStopItr = std::find(routeObj->stops.begin(), routeObj->stops.end(), stationANode);
+        auto stopEndItr = std::find(routeObj->stops.begin(), routeObj->stops.end(), stationBNode);
 
         for (; currentStopItr != stopEndItr; ++currentStopItr)
         {
-            auto nextStopId = *(std::next(currentStopItr));
-            travelTimeSum += GetTravelTime(*(currentStopItr), nextStopId);
+            Id currentStopId = (*(currentStopItr))->station.id;
+            Id nextStopId = (*(std::next(currentStopItr)))->station.id;
+            travelTimeSum += GetTravelTime(currentStopId, nextStopId);
         }
     }
 
@@ -226,7 +232,8 @@ unsigned int TransportNetwork::GetTravelTime(
 int TransportNetwork::GetStopNumberOnRoute(const Id& stationId, const Id& route)
 {
     auto routeStops = routes_[route]->stops;
-    auto stopItr = std::find(routeStops.begin(), routeStops.end(), stationId);
+    auto stationNode = stations_[stationId];
+    auto stopItr = std::find(routeStops.begin(), routeStops.end(), stationNode);
     if (stopItr == routeStops.end())
     {
         return 0;   // Stop is not on route
