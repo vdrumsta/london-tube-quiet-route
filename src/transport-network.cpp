@@ -2,9 +2,11 @@
 
 #include <algorithm>
 #include <stdexcept>
+#include <iostream>
 
 using NetworkMonitor::TransportNetwork;
 using Id = std::string;
+using json = nlohmann::json;
 
 bool NetworkMonitor::Station::operator== (const Station& other) const
 {
@@ -332,4 +334,84 @@ bool TransportNetwork::IsRouteStopsExist(const Route& route)
                         [&](const Id& stop){
                             return stations_.find(stop) != stations_.end();
                         });
+}
+
+bool TransportNetwork::FromJson(json&& src)
+{
+    bool ok {true};
+
+    try
+    {
+        int counter = 0;
+        // Add stations
+        for (auto&& jStation : src.at("stations"))
+        {
+            const auto stationId = jStation.at("station_id").get<std::string>();
+            const auto stationName = jStation.at("name").get<std::string>();
+
+            std::string temp = "station " + std::to_string(counter);
+            Station station {
+                temp,
+                stationName,
+            };
+            ok &= AddStation(station);
+
+            std::cout << "The vector elements are : " << std::endl;
+
+            for(auto& stationNode : stations_)
+            {
+                std::cout << stationNode.second->station.id << std::endl;
+            }
+            counter++;
+        }
+
+        // Add lines
+        auto& jLines = src["lines"];
+        for (auto& jLine : jLines)
+        {
+            // Create routes
+            std::vector<Route> routes{};
+            for (auto& jRoute : jLine["routes"])
+            {
+                Route route {
+                    jRoute["route_id"],
+                    jRoute["direction"],
+                    jRoute["line_id"],
+                    jRoute["start_station_id"],
+                    jRoute["end_station_id"],
+                    jRoute["route_stops"],
+                };
+                routes.push_back(route);
+            }
+
+            Line line {
+                jLine["line_id"],
+                jLine["name"],
+                routes
+            };
+            ok &= AddLine(line);
+        }
+
+        // Set travel times
+        for (auto& jTravelTime : src["travel_times"])
+        {
+            ok &= SetTravelTime(
+                jTravelTime["start_station_id"],
+                jTravelTime["end_station_id"],
+                jTravelTime["travel_time"]
+            );
+        }
+    }
+    catch (std::runtime_error e)
+    {
+        std::cout << e.what() << '\n';
+        throw e;
+    }
+    catch (json::exception& e)
+    {
+        std::cout << e.what() << '\n';
+        throw e;
+    }
+
+    return ok;
 }
