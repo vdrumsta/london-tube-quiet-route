@@ -21,9 +21,21 @@ bool NetworkMonitor::Route::operator== (const Route& other) const
     return id == other.id;
 }
 
-TransportNetwork::TransportNetwork() {}
+TransportNetwork::TransportNetwork() = default;
+TransportNetwork::~TransportNetwork() = default;
 
-TransportNetwork::~TransportNetwork() {}
+TransportNetwork::TransportNetwork(
+    const TransportNetwork& copied
+) = default;
+TransportNetwork::TransportNetwork(
+    TransportNetwork&& moved
+) = default;
+TransportNetwork& TransportNetwork::operator=(
+    const TransportNetwork& copied
+) = default;
+TransportNetwork& TransportNetwork::operator=(
+    TransportNetwork&& moved
+) = default;
 
 bool TransportNetwork::AddStation(const Station& station)
 {
@@ -132,8 +144,8 @@ long long int TransportNetwork::GetPassengerCount(const Id& station)
     {
         throw std::runtime_error("Station " + station + " not found.");
     }
-    
-    return stations_[station]->passengerCount;
+
+    return stations_.[station]->passengerCount;
 }
 
 bool TransportNetwork::RecordPassengerEvent(const PassengerEvent& event)

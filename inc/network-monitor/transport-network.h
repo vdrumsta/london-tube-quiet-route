@@ -104,29 +104,29 @@ public:
      */
     ~TransportNetwork();
 
-    // /*! \brief Copy constructor
-    //  */
-    // TransportNetwork(
-    //     const TransportNetwork& copied
-    // );
+    /*! \brief Copy constructor
+     */
+    TransportNetwork(
+        const TransportNetwork& copied
+    );
 
-    // /*! \brief Move constructor
-    //  */
-    // TransportNetwork(
-    //     TransportNetwork&& moved
-    // );
+    /*! \brief Move constructor
+     */
+    TransportNetwork(
+        TransportNetwork&& moved
+    );
 
-    // /*! \brief Copy assignment operator
-    //  */
-    // TransportNetwork& operator=(
-    //     const TransportNetwork& copied
-    // );
+    /*! \brief Copy assignment operator
+     */
+    TransportNetwork& operator=(
+        const TransportNetwork& copied
+    );
 
-    // /*! \brief Move assignment operator
-    //  */
-    // TransportNetwork& operator=(
-    //     TransportNetwork&& moved
-    // );
+    /*! \brief Move assignment operator
+     */
+    TransportNetwork& operator=(
+        TransportNetwork&& moved
+    );
 
     /*! \brief Add a station to the network.
      *
