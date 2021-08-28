@@ -283,7 +283,8 @@ private:
     *
     */
     struct GraphNode {
-        const Station& station;
+        Id id {};
+        std::string name {};
         std::map<Id, std::shared_ptr<GraphEdge>> outboundEdges {};
         std::map<Id, std::shared_ptr<GraphEdge>> inboundEdges {};
         long long int passengerCount {};

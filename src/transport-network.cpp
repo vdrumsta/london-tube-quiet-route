@@ -44,7 +44,13 @@ bool TransportNetwork::AddStation(const Station& station)
     // Check we're not adding a station with the same id
     if ( stations_.find(station.id) != stations_.end() ) return false;
 
-    std::shared_ptr<GraphNode> stationNode{new GraphNode{station, std::map<Id, std::shared_ptr<GraphEdge>> {}, {}, 0}};
+    auto stationNode{std::make_shared<GraphNode>(GraphNode{
+        station.id,
+        station.name,
+        {}, // We start with no outbound edges
+        {}, // We start with no inbound edges
+        0   // We start with no passengers
+    })};
     stations_.insert(std::pair<Id, std::shared_ptr<GraphNode>>{station.id, stationNode});
     return true;
 }
@@ -232,8 +238,8 @@ unsigned int TransportNetwork::GetTravelTime(
 
         for (; currentStopItr != stopEndItr; ++currentStopItr)
         {
-            Id currentStopId = (*(currentStopItr))->station.id;
-            Id nextStopId = (*(std::next(currentStopItr)))->station.id;
+            Id currentStopId = (*(currentStopItr))->id;
+            Id nextStopId = (*(std::next(currentStopItr)))->id;
             travelTimeSum += GetTravelTime(currentStopId, nextStopId);
         }
     }
@@ -342,27 +348,13 @@ bool TransportNetwork::FromJson(json&& src)
 
     try
     {
-        int counter = 0;
         // Add stations
         for (auto&& jStation : src.at("stations"))
-        {
-            const auto stationId = jStation.at("station_id").get<std::string>();
-            const auto stationName = jStation.at("name").get<std::string>();
-
-            std::string temp = "station " + std::to_string(counter);
-            Station station {
-                temp,
-                stationName,
-            };
-            ok &= AddStation(station);
-
-            std::cout << "The vector elements are : " << std::endl;
-
-            for(auto& stationNode : stations_)
-            {
-                std::cout << stationNode.second->station.id << std::endl;
-            }
-            counter++;
+        { 
+            ok &= AddStation(Station{
+                jStation["station_id"],
+                jStation["name"]
+            });
         }
 
         // Add lines
