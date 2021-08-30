@@ -694,47 +694,47 @@ BOOST_AUTO_TEST_CASE(from_json_travel_times)
 
 BOOST_AUTO_TEST_CASE(fail_on_bad_json)
 {
-    // nlohmann::json src {
-    //     // Missing "stations"!
-    //     {"lines", {}},
-    //     {"travel_times", {}},
-    // };
-    // TransportNetwork nw {};
-    // BOOST_CHECK_THROW(nw.FromJson(std::move(src)), nlohmann::json::exception);
+    nlohmann::json src {
+        // Missing "stations"!
+        {"lines", {}},
+        {"travel_times", {}},
+    };
+    TransportNetwork nw {};
+    BOOST_CHECK_THROW(nw.FromJson(std::move(src)), nlohmann::json::exception);
 }
 
 BOOST_AUTO_TEST_CASE(fail_on_good_json_bad_items)
 {
-    // nlohmann::json src {
-    //     {"stations", {
-    //         {
-    //             {"station_id", "station_0"},
-    //             {"name", "Station 0 Name"},
-    //         },
-    //         {
-    //             {"station_id", "station_0"},
-    //             {"name", "Station 0 Name"}, // station_0 is a duplicate!
-    //         },
-    //     }},
-    //     {"lines", {}},
-    //     {"travel_times", {}},
-    // };
-    // TransportNetwork nw {};
-    // BOOST_CHECK_THROW(nw.FromJson(std::move(src)), std::runtime_error);
+    nlohmann::json src {
+        {"stations", {
+            {
+                {"station_id", "station_0"},
+                {"name", "Station 0 Name"},
+            },
+            {
+                {"station_id", "station_0"},
+                {"name", "Station 0 Name"}, // station_0 is a duplicate!
+            },
+        }},
+        {"lines", {}},
+        {"travel_times", {}},
+    };
+    TransportNetwork nw {};
+    BOOST_CHECK_THROW(nw.FromJson(std::move(src)), std::runtime_error);
 }
 
 BOOST_AUTO_TEST_CASE(fail_on_bad_travel_times)
 {
-    // // In this file, we have an invalid travel time (for a station that does
-    // // not exist).
-    // auto testFilePath {
-    //     std::filesystem::path(TEST_DATA) / "from_json_bad_travel_times.json"
-    // };
-    // auto src = ParseJsonFile(testFilePath);
+    // In this file, we have an invalid travel time (for a station that does
+    // not exist).
+    auto testFilePath {
+        std::filesystem::path(TEST_DATA) / "from_json_bad_travel_times.json"
+    };
+    auto src = ParseJsonFile(testFilePath);
 
-    // TransportNetwork nw {};
-    // auto ok {nw.FromJson(std::move(src))};
-    // BOOST_REQUIRE(!ok);
+    TransportNetwork nw {};
+    auto ok {nw.FromJson(std::move(src))};
+    BOOST_REQUIRE(!ok);
 }
 
 BOOST_AUTO_TEST_SUITE_END(); // FromJson

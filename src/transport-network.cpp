@@ -355,6 +355,11 @@ bool TransportNetwork::FromJson(json&& src)
                 jStation["station_id"],
                 jStation["name"]
             });
+
+            if (!ok) 
+            {
+                throw std::runtime_error("Could not add station " + jStation["station_id"].get<std::string>());
+            }
         }
 
         // Add lines
