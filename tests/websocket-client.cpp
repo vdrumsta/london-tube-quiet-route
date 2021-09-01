@@ -8,7 +8,7 @@
 #include <filesystem>
 
 using boost::asio::ip::tcp;
-using NetworkMonitor::WebSocketClient;
+using NetworkMonitor::BoostWebSocketClient;
 namespace ssl = boost::asio::ssl;
 
 bool CheckResponse(const std::string& response)
@@ -53,7 +53,7 @@ BOOST_AUTO_TEST_CASE(class_WebSocketClient)
     ctx.load_verify_file(TESTS_CACERT_PEM); // TESTS_CACERT_PEM is defined in CMake
 
     // The class under test
-    WebSocketClient client {url, endpoint, port, ioc, ctx};
+    BoostWebSocketClient client {url, endpoint, port, ioc, ctx};
 
     // We use these flags to check that the connection, send, receive functions
     // work as expected.

@@ -29,7 +29,6 @@ endif()
 
 # Libraries
 set(LIB_SOURCES
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/websocket-client.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/file-downloader.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/transport-network.cpp"
 )
