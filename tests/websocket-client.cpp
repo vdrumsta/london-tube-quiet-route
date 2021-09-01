@@ -1,15 +1,74 @@
+#include "boost-mock.h"
+
 #include <network-monitor/websocket-client.h>
 
 #include <boost/asio.hpp>
 #include <boost/asio/ssl.hpp>
 #include <boost/test/unit_test.hpp>
 
-#include <string>
+#include <chrono>
 #include <filesystem>
+#include <mutex>
+#include <string>
 
-using boost::asio::ip::tcp;
 using NetworkMonitor::BoostWebSocketClient;
-namespace ssl = boost::asio::ssl;
+
+using NetworkMonitor::MockResolver;
+using NetworkMonitor::TestWebSocketClient;
+
+// This fixture is used to re-initialize all mock properties before a test.
+struct WebSocketClientTestFixture {
+    WebSocketClientTestFixture()
+    {
+        MockResolver::resolveEc = {};
+    }
+};
+
+// Use this to set a timeout on tests that may hang or suffer from a slow
+// connection.
+using timeout = boost::unit_test::timeout;
+
+BOOST_AUTO_TEST_SUITE(network_monitor);
+
+BOOST_AUTO_TEST_SUITE(class_WebSocketClient);
+
+BOOST_AUTO_TEST_CASE(cacert_pem)
+{
+    BOOST_CHECK(std::filesystem::exists(TESTS_CACERT_PEM));
+}
+
+BOOST_FIXTURE_TEST_SUITE(Connect, WebSocketClientTestFixture);
+
+BOOST_AUTO_TEST_CASE(fail_resolve, *timeout {1})
+{
+    // We use the mock client so we don't really connect to the target.
+    const std::string url {"some.echo-server.com"};
+    const std::string endpoint {"/"};
+    const std::string port {"443"};
+
+    boost::asio::ssl::context ctx {boost::asio::ssl::context::tlsv12_client};
+    ctx.load_verify_file(TESTS_CACERT_PEM);
+    boost::asio::io_context ioc {};
+
+    // Set the expected error codes.
+    MockResolver::resolveEc = boost::asio::error::host_not_found;
+
+    TestWebSocketClient client {url, endpoint, port, ioc, ctx};
+    bool calledOnConnect {false};
+    auto onConnect {[&calledOnConnect](auto ec) {
+        calledOnConnect = true;
+        BOOST_CHECK_EQUAL(ec, boost::asio::error::host_not_found);
+    }};
+    client.Connect(onConnect);
+    ioc.run();
+
+    // When we get here, the io_context::run function has run out of work to do.
+    BOOST_CHECK(calledOnConnect);
+}
+
+BOOST_AUTO_TEST_SUITE_END(); // Connect
+
+BOOST_AUTO_TEST_SUITE(live);
 
 bool CheckResponse(const std::string& response)
 {
@@ -18,21 +77,16 @@ bool CheckResponse(const std::string& response)
     bool ok {true};
     ok &= response.find("ERROR") != std::string::npos;
     ok &= response.find("ValidationInvalidAuth") != std::string::npos;
-
-    std::cout << response << std::endl;
     return ok;
 }
 
-BOOST_AUTO_TEST_SUITE(network_monitor);
-
-BOOST_AUTO_TEST_CASE(class_WebSocketClient)
+BOOST_AUTO_TEST_CASE(network_events, *timeout {3})
 {
     // Connection targets
     const std::string url {"ltnm.learncppthroughprojects.com"};
     const std::string endpoint {"/network-events"};
     const std::string port {"443"};
-    std::string response_msg;
-    
+
     // STOMP frame
     const std::string username {"fake_username"};
     const std::string password {"fake_password"};
@@ -46,11 +100,12 @@ BOOST_AUTO_TEST_CASE(class_WebSocketClient)
        << '\0'; // The body (even if absent) must be followed by a NULL octet.
     const std::string message {ss.str()};
 
+    // TLS context
+    boost::asio::ssl::context ctx {boost::asio::ssl::context::tlsv12_client};
+    ctx.load_verify_file(TESTS_CACERT_PEM);
+
     // Always start with an I/O context object.
     boost::asio::io_context ioc {};
-
-    ssl::context ctx(ssl::context::tlsv12_client);
-    ctx.load_verify_file(TESTS_CACERT_PEM); // TESTS_CACERT_PEM is defined in CMake
 
     // The class under test
     BoostWebSocketClient client {url, endpoint, port, ioc, ctx};
@@ -60,8 +115,8 @@ BOOST_AUTO_TEST_CASE(class_WebSocketClient)
     bool connected {false};
     bool messageSent {false};
     bool messageReceived {false};
-    bool messageMatches {false};
     bool disconnected {false};
+    std::string response {};
 
     // Our own callbacks
     auto onSend {[&messageSent](auto ec) {
@@ -77,14 +132,11 @@ BOOST_AUTO_TEST_CASE(class_WebSocketClient)
         disconnected = !ec;
     }};
     auto onReceive {[&client,
-                      &onClose,
-                      &messageReceived,
-                      &messageMatches,
-                      &message,
-                      &response_msg](auto ec, auto received) {
+                     &onClose,
+                     &messageReceived,
+                     &response](auto ec, auto received) {
         messageReceived = !ec;
-        messageMatches = message == received;
-        response_msg = std::move(received);
+        response = std::move(received);
         client.Close(onClose);
     }};
 
@@ -97,12 +149,11 @@ BOOST_AUTO_TEST_CASE(class_WebSocketClient)
     BOOST_CHECK(messageSent);
     BOOST_CHECK(messageReceived);
     BOOST_CHECK(disconnected);
-    BOOST_CHECK(CheckResponse(response_msg));
+    BOOST_CHECK(CheckResponse(response));
 }
 
-BOOST_AUTO_TEST_CASE(cacert_pem)
-{
-    BOOST_CHECK(std::filesystem::exists(TESTS_CACERT_PEM)); 
-}
+BOOST_AUTO_TEST_SUITE_END(); // live
 
-BOOST_AUTO_TEST_SUITE_END();
+BOOST_AUTO_TEST_SUITE_END(); // class_WebSocketClient
+
+BOOST_AUTO_TEST_SUITE_END(); // network_monitor
