@@ -16,6 +16,7 @@ find_package(CURL REQUIRED)
 find_package(cpr REQUIRED)
 find_package(OpenSSL REQUIRED)
 find_package(nlohmann_json REQUIRED)
+find_package(spdlog REQUIRED)
 
 # Called before any other target is defined.
 enable_testing()
@@ -48,6 +49,7 @@ target_link_libraries(network-monitor
         OpenSSL::OpenSSL
         cpr::cpr
         nlohmann_json::nlohmann_json
+        spdlog::spdlog
 )
 # Tell CMake to look for header files in these directories
 target_include_directories(network-monitor
@@ -81,6 +83,7 @@ target_link_libraries(network-monitor-tests
         Boost::Boost
         OpenSSL::OpenSSL
         nlohmann_json::nlohmann_json
+        spdlog::spdlog
 )
 add_test(
     NAME network-monitor-tests
