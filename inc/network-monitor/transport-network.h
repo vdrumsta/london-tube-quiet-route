@@ -1,3 +1,8 @@
+#ifndef NETWORK_MONITOR_TRANSPORT_NETWORK_H
+#define NETWORK_MONITOR_TRANSPORT_NETWORK_H
+
+#include <boost/date_time/posix_time/posix_time.hpp>
+
 #include <nlohmann/json.hpp>
 
 #include <string>
@@ -91,7 +96,13 @@ struct PassengerEvent {
 
     Id stationId {};
     Type type {Type::In};
+    boost::posix_time::ptime timestamp {};
 };
+
+void from_json(
+    const nlohmann::json& src,
+    PassengerEvent& dst
+);
 
 /*! \brief Underground network representation
  */
@@ -400,3 +411,5 @@ private:
 };
 
 } // namespace NetworkMonitor
+
+#endif // NETWORK_MONITOR_TRANSPORT_NETWORK_H

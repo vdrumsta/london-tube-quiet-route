@@ -49,7 +49,7 @@ BOOST_AUTO_TEST_CASE(file_downloader)
 
 BOOST_AUTO_TEST_CASE(network_layout_parser)
 {
-    std::filesystem::path layoutPath{TEST_NETWORK_LAYOUT};
+    std::filesystem::path layoutPath{TESTS_NETWORK_LAYOUT_JSON};
     auto parsedFile = ParseJsonFile(layoutPath);
     BOOST_CHECK(parsedFile.is_object());
     BOOST_CHECK(parsedFile.contains("lines"));
