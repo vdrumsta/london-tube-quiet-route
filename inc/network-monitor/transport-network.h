@@ -5,10 +5,12 @@
 
 #include <nlohmann/json.hpp>
 
-#include <string>
-#include <vector>
-#include <map>
 #include <memory>
+#include <ostream>
+#include <string>
+#include <unordered_map>
+#include <utility>
+#include <vector>
 
 namespace NetworkMonitor {
 
@@ -104,10 +106,69 @@ void from_json(
     PassengerEvent& dst
 );
 
+/*! \brief Travel plan between two stations.
+ *
+ *  If startStationId and endStationId are the same station, the travel steps
+ *  vector contains one item.
+ *
+ *  If there is no valid travel route between startStationId and endStationId,
+ *  or if any of startStationId and endStationId is not in the network, the
+ *  travel steps vector is empty.
+ */
+struct TravelRoute {
+    struct Step {
+        Id startStationId {};
+        Id endStationId {};
+        Id lineId {};
+        Id routeId {};
+        unsigned int travelTime {0};
+
+        bool operator==(const Step& other) const;
+    };
+
+    Id startStationId {};
+    Id endStationId {};
+    unsigned int totalTravelTime {0};
+    std::vector<Step> steps {};
+
+    bool operator==(const TravelRoute& other) const;
+};
+
+/*! \brief Print operator for the `TravelRoute` class.
+ */
+std::ostream& operator<<(std::ostream& os, const TravelRoute& r);
+
+/* \brief Serialize TravelRoute::Step to JSON.
+ */
+void to_json(
+    nlohmann::json& dst,
+    const TravelRoute::Step& src
+);
+
+/* \brief Serialize TravelRoute::Step from JSON.
+ */
+void from_json(
+    const nlohmann::json& src,
+    TravelRoute::Step& dst
+);
+
+/* \brief Serialize TravelRoute to JSON.
+ */
+void to_json(
+    nlohmann::json& dst,
+    const TravelRoute& src
+);
+
+/* \brief Serialize TravelRoute from JSON.
+ */
+void from_json(
+    const nlohmann::json& src,
+    TravelRoute& dst
+);
+
 /*! \brief Underground network representation
  */
 class TransportNetwork {
-
 public:
     /*! \brief Default constructor
      */
@@ -139,6 +200,23 @@ public:
      */
     TransportNetwork& operator=(
         TransportNetwork&& moved
+    );
+
+    /*! \brief Populate the network from a JSON object.
+     *
+     *  \param src Ownership of the source JSON object is moved to this method.
+     *
+     *  \returns false if stations and lines where parsed successfully, but not
+     *           the travel times.
+     *
+     *  \throws std::runtime_error This method throws if the JSON items were
+     *                             parsed correctly but there was an issue
+     *                             adding new stations or lines to the network.
+     *  \throws nlohmann::json::exception If there was a problem parsing the
+     *                                    JSON object.
+     */
+    bool FromJson(
+        nlohmann::json&& src
     );
 
     /*! \brief Add a station to the network.
@@ -187,7 +265,7 @@ public:
      */
     long long int GetPassengerCount(
         const Id& station
-    );
+    ) const;
 
     /*! \brief Get list of routes serving a given station.
      *
@@ -199,7 +277,7 @@ public:
      */
     std::vector<Id> GetRoutesServingStation(
         const Id& station
-    );
+    ) const;
 
     /*! \brief Set the travel time between 2 adjacent stations.
      *
@@ -232,7 +310,7 @@ public:
     unsigned int GetTravelTime(
         const Id& stationA,
         const Id& stationB
-    );
+    ) const;
 
     /*! \brief Get the total travel time between any 2 stations, on a specific
      *         route.
@@ -251,54 +329,45 @@ public:
         const Id& route,
         const Id& stationA,
         const Id& stationB
-    );
+    ) const;
 
-    /*! \brief Populate the network from a JSON object.
-     *
-     *  \param src Ownership of the source JSON object is moved to this method.
-     *
-     *  \returns false if stations and lines where parsed successfully, but not
-     *           the travel times.
-     *
-     *  \throws std::runtime_error This method throws if the JSON items were
-     *                             parsed correctly but there was an issue
-     *                             adding new stations or lines to the network.
-     *  \throws nlohmann::json::exception If there was a problem parsing the
-     *                                    JSON object.
+    /*! \brief Get the fastest travel route from station A to station B.
      */
-    bool FromJson(
-        nlohmann::json&& src
-    );
+    TravelRoute GetFastestTravelRoute(
+        const Id& stationA,
+        const Id& stationB
+    ) const;
 
 private:
-    // forward declaration
-    struct LineInternal;
+    // Forward-declare all internal structs.
     struct GraphNode;
+    struct GraphEdge;
+    struct RouteInternal;
+    struct LineInternal;
 
-    /*! \brief Graph edge
-    *
-    *  Graph edge connects to a graph node
-    */
-    struct GraphEdge {
-        enum class Direction {
-            Inbound,
-            Outbound
-        };
-
-        std::vector<Id> routeIds{};
-        std::shared_ptr<GraphNode> nextNode;
-        unsigned int travelTime;
-    };
-
-    /*! \brief Graph node of a station
-    *
-    */
+    // Graph node
+    // We use this as the internal station representation.
     struct GraphNode {
         Id id {};
         std::string name {};
-        std::map<Id, std::shared_ptr<GraphEdge>> outboundEdges {};
-        std::map<Id, std::shared_ptr<GraphEdge>> inboundEdges {};
-        long long int passengerCount {};
+        long long int passengerCount {0};
+        std::vector<std::shared_ptr<GraphEdge>> edges {};
+
+        // Find the edge for a specific line route.
+        std::vector<
+            std::shared_ptr<GraphEdge>
+        >::const_iterator FindEdgeForRoute(
+            const std::shared_ptr<RouteInternal>& route
+        ) const;
+    };
+
+    // Graph edge
+    // We keep one edge for each route going through a node, even if multiple
+    // routes go through the same node.
+    struct GraphEdge {
+        std::shared_ptr<RouteInternal> route {nullptr};
+        std::shared_ptr<GraphNode> nextStop {nullptr};
+        unsigned int travelTime {0};
     };
 
     // Internal route representation
@@ -313,100 +382,65 @@ private:
     struct LineInternal {
         Id id {};
         std::string name {};
-        std::map<Id, std::shared_ptr<RouteInternal>> routes {};
+        std::unordered_map<Id, std::shared_ptr<RouteInternal>> routes {};
     };
 
-    std::map<const Id, std::shared_ptr<LineInternal>> lines_ {};
-    std::map<const Id, std::shared_ptr<RouteInternal>> routes_ {};
-    std::map<const Id, std::shared_ptr<GraphNode>> stations_;
+    // A PathStop object represents a stop and the network edge to get to it.
+    // We use it internally in our path-finding algorithms.
+    struct PathStop {
+        std::shared_ptr<GraphNode> node {nullptr};
+        std::shared_ptr<GraphEdge> edge {nullptr};
 
-    /*! \brief Add a route to all station on the route*/
-    void AddRouteToLine(
+        bool operator==(
+            const PathStop& other
+        ) const;
+    };
+
+    // We need a custom PathStop hasher to use PathStop in std::unordered_map.
+    struct PathStopHash {
+        size_t operator()(
+            const PathStop& stop
+        ) const;
+    };
+
+    // We use PathStopDist in our path-finding algorithm to rank path stops
+    // by their distance from the path starting point.
+    using PathStopDist = std::pair<PathStop, unsigned int>;
+
+    // We need a custom PathStopDist comparator object to use PathStopDist in
+    // std::priority_queue.
+    struct PathStopDistCmp {
+        bool operator()(
+            const PathStopDist& a,
+            const PathStopDist& b
+        ) const;
+    };
+
+    // Map station and lines by ID. We do not map line routes here, as they
+    // are mapped within each line representation.
+    std::unordered_map<Id, std::shared_ptr<GraphNode>> stations_ {};
+    std::unordered_map<Id, std::shared_ptr<LineInternal>> lines_ {};
+
+    // Get station by ID.
+    std::shared_ptr<GraphNode> GetStation(
+        const Id& stationId
+    ) const;
+
+    // Get line by ID.
+    std::shared_ptr<LineInternal> GetLine(
+        const Id& lineId
+    ) const;
+
+    // Get route by ID.
+    std::shared_ptr<RouteInternal> GetRoute(
+        const Id& lineId,
+        const Id& routeId
+    ) const;
+
+    // This function adds a route to the internal line representation.
+    bool AddRouteToLine(
         const Route& route,
-        std::shared_ptr<LineInternal>& line
-    );
-
-    /*! \brief Add a graph edge from station A to station B */
-    void AddEdge(
-        const Id& stationA,
-        const Id& stationB,
-        const Id& routeId
-    );
-
-    /*! \brief Add route to an existing edge or if one already exists make a new one */
-    void AddRouteToEdge(
-        std::map<Id, std::shared_ptr<GraphEdge>>& edges,
-        const Id& stationId,
-        const Id& routeId
-    );
-
-    /*! \brief Get an edge between from station A to station B with a specified direction
-    *
-    *   \return null if edge doesn't exist, if it does, return the edge
-    * 
-    */
-    std::shared_ptr<GraphEdge> GetEdge(
-        const Id& stationA,
-        const Id& stationB,
-        const GraphEdge::Direction& direction
-    );
-
-    /*! \brief Check if an edge exists between 2 stations
-    *
-    *   \return true if an edge exists
-    * 
-    */
-    bool IsEdgeExists(
-        const Id& stationA,
-        const Id& stationB
-    );
-
-    /*! \brief Check if all stations in a route exist
-    *
-    *   \return true if all stops in a route are present in stations_
-    * 
-    */
-    bool IsRouteStopsExist(
-        const Route& route
-    );
-
-    bool IsEdgesExists(
-        const Id& stationA,
-        const Id& stationB
-    );
-
-    /*! \brief Get a number which tells which stop on a route a station is
-    *
-    *   \return number of the stop of a station on route.
-    *   0 if it doesn't exist on route
-    * 
-    */
-    int GetStopNumberOnRoute(
-        const Id& stationId,
-        const Id& route
-    );
-
-    /*! \brief Get a graph direction between stops
-    *   
-    *   Prerequisite is that the station graph must be constructed correctly
-    *
-    *   e.g.    On a route station A -> station B -> station C
-    *           the station A, station C direction would be Outbound.
-    *           On the same route, station C, station B direction would be Inbound.
-    *   
-    *   \return Direction between 2 stations on a route
-    * 
-    */
-    GraphEdge::Direction GetDirectionBetweenStops(
-        const Id& stationA,
-        const Id& stationB,
-        const Id& route
-    );
-
-    /*! \brief Find unique routes in a map of edges and add them to a vector */
-    void AddUniqueEdgeRoutes(
-        const std::map<Id, std::shared_ptr<GraphEdge>>& edges,
-        std::vector<Id>& oFoundRoutes
+        const std::shared_ptr<LineInternal>& lineInternal
     );
 };
 
