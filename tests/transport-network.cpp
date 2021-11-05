@@ -1,25 +1,26 @@
-#include <network-monitor/transport-network.h>
 #include <network-monitor/file-downloader.h>
+#include <network-monitor/transport-network.h>
 
 #include <boost/test/unit_test.hpp>
 
 #include <nlohmann/json.hpp>
 
+#include <algorithm>
+#include <cmath>
 #include <filesystem>
 #include <fstream>
 #include <stdexcept>
 #include <string>
-#include <string>
-#include <vector>
 #include <utility>
+#include <vector>
 
 using NetworkMonitor::Id;
 using NetworkMonitor::Line;
 using NetworkMonitor::PassengerEvent;
+using NetworkMonitor::ParseJsonFile;
 using NetworkMonitor::Route;
 using NetworkMonitor::Station;
 using NetworkMonitor::TransportNetwork;
-using NetworkMonitor::ParseJsonFile;
 using NetworkMonitor::TravelRoute;
 
 // Use this to set a timeout on tests that may hang.
@@ -221,6 +222,7 @@ BOOST_AUTO_TEST_CASE(missing_stations)
 {
     TransportNetwork nw {};
     bool ok {false};
+
     // Define a line with 1 route.
     // route0: 0 ---> 1 ---> 2
     Station station0 {
@@ -248,9 +250,11 @@ BOOST_AUTO_TEST_CASE(missing_stations)
         "Line Name",
         {route0},
     };
+
     // Expected fail: No stations in the network.
     ok = nw.AddLine(line);
     BOOST_CHECK(!ok);
+
     // Expected fail: We add all stations except one.
     ok = true;
     ok &= nw.AddStation(station0);
@@ -258,6 +262,7 @@ BOOST_AUTO_TEST_CASE(missing_stations)
     BOOST_REQUIRE(ok);
     ok = nw.AddLine(line);
     BOOST_CHECK(!ok);
+
     // Expected success: We add the final station and try again.
     ok = nw.AddStation(station2);
     BOOST_REQUIRE(ok);
@@ -412,6 +417,7 @@ BOOST_AUTO_TEST_CASE(lone_station)
 {
     TransportNetwork nw {};
     bool ok {false};
+
     // Add a single station.
     Station station0 {
         "station_000",
@@ -419,6 +425,7 @@ BOOST_AUTO_TEST_CASE(lone_station)
     };
     ok = nw.AddStation(station0);
     BOOST_REQUIRE(ok);
+
     // Check the routes served.
     auto routes {nw.GetRoutesServingStation(station0.id)};
     BOOST_CHECK_EQUAL(routes.size(), 0);
@@ -748,7 +755,9 @@ BOOST_AUTO_TEST_SUITE(Routes);
 
 static std::pair<TransportNetwork, TravelRoute> GetTestNetwork(
     const std::string& filenameNoExtension,
-    bool useOriginalNetworkLayoutFile = false
+    bool useOriginalNetworkLayoutFile = false,
+    bool readPassengerCounts = false,
+    const std::string& resultFilenamePost = ""
 )
 {
     auto testFilePath {useOriginalNetworkLayoutFile ?
@@ -761,9 +770,34 @@ static std::pair<TransportNetwork, TravelRoute> GetTestNetwork(
     auto ok {nw.FromJson(std::move(src))};
     BOOST_REQUIRE(ok);
 
+    if (readPassengerCounts) {
+        auto passengerCountsFilePath {
+            std::filesystem::path(TEST_DATA) /
+            (filenameNoExtension + ".counts.json")
+        };
+        auto passengerCountsJson = ParseJsonFile(passengerCountsFilePath);
+        std::unordered_map<Id, int> passengerCounts {};
+        try {
+            passengerCounts = passengerCountsJson.get<
+                std::unordered_map<Id, int>
+            >();
+        } catch (...) {
+            BOOST_FAIL(std::string("Failed to parse passenger counts file: ") +
+                       passengerCountsFilePath.string());
+        }
+        for (const auto& [stationId, passengerCount]: passengerCounts) {
+            auto type {passengerCount > 0 ? PassengerEvent::Type::In :
+                                            PassengerEvent::Type::Out};
+            for (size_t _ {0}; _ < std::abs(passengerCount); ++_) {
+                nw.RecordPassengerEvent({stationId, type, {}});
+            }
+        }
+    }
+
     auto resultFilePath {
         std::filesystem::path(TEST_DATA) /
-        (filenameNoExtension + ".result.json")
+        (filenameNoExtension + ".result." +
+         (resultFilenamePost == "" ? "json" : (resultFilenamePost + ".json")))
     };
     auto travelRouteJson = ParseJsonFile(resultFilePath);
     TravelRoute travelRoute;
@@ -850,6 +884,337 @@ BOOST_AUTO_TEST_CASE(ltc_path2, *timeout {1})
 }
 
 BOOST_AUTO_TEST_SUITE_END(); // GetFastestTravelRoute
+
+BOOST_AUTO_TEST_SUITE(GetQuietTravelRoute);
+
+// Same as fastest-route counterpart
+BOOST_AUTO_TEST_CASE(same_station)
+{
+    double maxSlowdownPc {0.1};
+    double minQuietnessPc {0.1};
+    auto [nw, resultTravelRoute] = GetTestNetwork(
+        "network_fastest_path_same_station"
+    );
+    auto travelRoute {nw.GetQuietTravelRoute(
+        "station_A",
+        "station_A",
+        maxSlowdownPc,
+        minQuietnessPc
+    )};
+    BOOST_CHECK_EQUAL(travelRoute, resultTravelRoute);
+}
+
+// Same as fastest-route counterpart
+BOOST_AUTO_TEST_CASE(missing_station)
+{
+    double maxSlowdownPc {0.1};
+    double minQuietnessPc {0.1};
+    auto [nw, resultTravelRoute] = GetTestNetwork(
+        "network_fastest_path_missing_station"
+    );
+    auto travelRoute {nw.GetQuietTravelRoute(
+        "station_A",
+        "station_X",
+        maxSlowdownPc,
+        minQuietnessPc
+    )};
+    BOOST_CHECK_EQUAL(travelRoute, resultTravelRoute);
+}
+
+// Same as fastest-route counterpart
+BOOST_AUTO_TEST_CASE(no_path)
+{
+    double maxSlowdownPc {0.1};
+    double minQuietnessPc {0.1};
+    auto [nw, resultTravelRoute] = GetTestNetwork(
+        "network_fastest_path_no_path"
+    );
+    auto travelRoute {nw.GetQuietTravelRoute(
+        "station_A",
+        "station_B",
+        maxSlowdownPc,
+        minQuietnessPc
+    )};
+    BOOST_CHECK_EQUAL(travelRoute, resultTravelRoute);
+}
+
+// Same as fastest-route counterpart
+BOOST_AUTO_TEST_CASE(one_route, *timeout {1})
+{
+    double maxSlowdownPc {0.1};
+    double minQuietnessPc {0.1};
+    auto [nw, resultTravelRoute] = GetTestNetwork(
+        "network_fastest_path_1route"
+    );
+    auto travelRoute {nw.GetQuietTravelRoute(
+        "station_A",
+        "station_B",
+        maxSlowdownPc,
+        minQuietnessPc
+    )};
+    BOOST_CHECK_EQUAL(travelRoute, resultTravelRoute);
+}
+
+// Same as fastest-route counterpart
+BOOST_AUTO_TEST_CASE(two_routes, *timeout {1})
+{
+    double maxSlowdownPc {0.1};
+    double minQuietnessPc {0.1};
+    auto [nw, resultTravelRoute] = GetTestNetwork(
+        "network_fastest_path_2routes"
+    );
+    auto travelRoute {nw.GetQuietTravelRoute(
+        "station_A",
+        "station_B",
+        maxSlowdownPc,
+        minQuietnessPc
+    )};
+    BOOST_CHECK_EQUAL(travelRoute, resultTravelRoute);
+}
+
+// Same as fastest-route counterpart
+BOOST_AUTO_TEST_CASE(two_routes_overlap, *timeout {1})
+{
+    double maxSlowdownPc {0.1};
+    double minQuietnessPc {0.1};
+    auto [nw, resultTravelRoute] = GetTestNetwork(
+        "network_fastest_path_2routes_overlap"
+    );
+    auto travelRoute {nw.GetQuietTravelRoute(
+        "station_A",
+        "station_B",
+        maxSlowdownPc,
+        minQuietnessPc
+    )};
+    BOOST_CHECK_EQUAL(travelRoute, resultTravelRoute);
+}
+
+// Same as fastest-route counterpart
+BOOST_AUTO_TEST_CASE(ltc_path1, *timeout {1})
+{
+    double maxSlowdownPc {0.1};
+    double minQuietnessPc {0.1};
+    size_t maxNPaths {20};
+    auto [nw, resultTravelRoute] = GetTestNetwork("ltc_path1", true);
+    auto travelRoute {nw.GetQuietTravelRoute(
+        "station_003",
+        "station_019",
+        maxSlowdownPc,
+        minQuietnessPc,
+        maxNPaths
+    )};
+    BOOST_CHECK_EQUAL(travelRoute, resultTravelRoute);
+}
+
+// Same as fastest-route counterpart
+BOOST_AUTO_TEST_CASE(ltc_path2, *timeout {5})
+{
+    double maxSlowdownPc {0.1};
+    double minQuietnessPc {0.1};
+    size_t maxNPaths {20};
+    auto [nw, resultTravelRoute] = GetTestNetwork("ltc_path2", true);
+    auto travelRoute {nw.GetQuietTravelRoute(
+        "station_211",
+        "station_119",
+        maxSlowdownPc,
+        minQuietnessPc,
+        maxNPaths
+    )};
+    BOOST_CHECK_EQUAL(travelRoute, resultTravelRoute);
+}
+
+BOOST_AUTO_TEST_CASE(network_quiet_path_2routes, *timeout {1})
+{
+    // Network under test:
+    //
+    // Route 0: [A]--3--[0]--1--[1]--2--[2]--3--[3]--1--[B]
+    //                           |       |               |
+    // Route 1:                  |       |---3--[4]--2---|
+    //                           |                       |
+    // Route 2:                  |---2--[5]--3--[6]--3---|
+    //
+    // All 3 routes have a path from A to B.
+    // They all share the same travel times except for the last segment.
+    // All stations are given a passenger count of 0 except for [3], [4], [6],
+    // which alone determine the crowding level of the 3 routes.
+
+    // Baseline: No leeway, which should find the fastest route.
+    {
+        double maxSlowdownPc {0.0};
+        double minQuietnessPc {0.0};
+        auto [nw, resultTravelRoute] = GetTestNetwork(
+            "network_quiet_path_2routes", false, true, "route_0"
+        );
+        auto travelRoute {nw.GetQuietTravelRoute(
+            "station_A",
+            "station_B",
+            maxSlowdownPc,
+            minQuietnessPc
+        )};
+        BOOST_CHECK_EQUAL(travelRoute, resultTravelRoute);
+    }
+
+    // We allow up to 10% travel time increase for a 10%+ crowding decrease.
+    {
+        double maxSlowdownPc {0.1};
+        double minQuietnessPc {0.1};
+        auto [nw, resultTravelRoute] = GetTestNetwork(
+            "network_quiet_path_2routes", false, true, "route_1"
+        );
+        auto travelRoute {nw.GetQuietTravelRoute(
+            "station_A",
+            "station_B",
+            maxSlowdownPc,
+            minQuietnessPc
+        )};
+        BOOST_CHECK_EQUAL(travelRoute, resultTravelRoute);
+    }
+
+    // We allow up to 20% travel time increase for a 20%+ crowding decrease.
+    {
+        double maxSlowdownPc {0.2};
+        double minQuietnessPc {0.2};
+        auto [nw, resultTravelRoute] = GetTestNetwork(
+            "network_quiet_path_2routes", false, true, "route_2"
+        );
+        auto travelRoute {nw.GetQuietTravelRoute(
+            "station_A",
+            "station_B",
+            maxSlowdownPc,
+            minQuietnessPc
+        )};
+        BOOST_CHECK_EQUAL(travelRoute, resultTravelRoute);
+    }
+
+    // Same as before, with a lower threshold for the crowding levels. We get
+    // the same result because we still look for the maximum crowding gain
+    // given the travel time requirements.
+    {
+        double maxSlowdownPc {0.2};
+        double minQuietnessPc {0.1}; // !
+        auto [nw, resultTravelRoute] = GetTestNetwork(
+            "network_quiet_path_2routes", false, true, "route_2"
+        );
+        auto travelRoute {nw.GetQuietTravelRoute(
+            "station_A",
+            "station_B",
+            maxSlowdownPc,
+            minQuietnessPc
+        )};
+        BOOST_CHECK_EQUAL(travelRoute, resultTravelRoute);
+    }
+
+    // When the crowding requirement cannot be met, we pick the fastest route.
+    {
+        double maxSlowdownPc {0.1};
+        double minQuietnessPc {0.2}; // Can't be met with only 10% travel
+                                     // time increase.
+        auto [nw, resultTravelRoute] = GetTestNetwork(
+            "network_quiet_path_2routes", false, true, "route_0"
+        );
+        auto travelRoute {nw.GetQuietTravelRoute(
+            "station_A",
+            "station_B",
+            maxSlowdownPc,
+            minQuietnessPc
+        )};
+        BOOST_CHECK_EQUAL(travelRoute, resultTravelRoute);
+    }
+}
+
+BOOST_AUTO_TEST_CASE(ltc_quiet1, *timeout {1})
+{
+    // This is a path where route_000 is the obvious and most convenient choice.
+    // We must relax the travel time requirements by a lot to even consider
+    // more quiet routes.
+
+    // Note: Setting this value affects the the results we find. The results
+    //       may be subotpimal.
+    size_t maxNPaths {20};
+
+    // 10% travel time relaxation is not enough to use other routes.
+    {
+        double maxSlowdownPc {0.1};
+        double minQuietnessPc {0.1};
+        auto [nw, resultTravelRoute] = GetTestNetwork(
+            "ltc_quiet1", true, true, "route_000"
+        );
+        auto travelRoute {nw.GetQuietTravelRoute(
+            "station_003",
+            "station_019",
+            maxSlowdownPc,
+            minQuietnessPc,
+            maxNPaths
+        )};
+        BOOST_CHECK_EQUAL(travelRoute, resultTravelRoute);
+    }
+
+    // With 40% travel time relaxation we can pick a route with 10% crowding
+    // improvement.
+    {
+        double maxSlowdownPc {0.4};
+        double minQuietnessPc {0.1};
+        auto [nw, resultTravelRoute] = GetTestNetwork(
+            "ltc_quiet1", true, true, "route_032"
+        );
+        auto travelRoute {nw.GetQuietTravelRoute(
+            "station_003",
+            "station_019",
+            maxSlowdownPc,
+            minQuietnessPc,
+            maxNPaths
+        )};
+        BOOST_CHECK_EQUAL(travelRoute, resultTravelRoute);
+    }
+}
+
+BOOST_AUTO_TEST_CASE(ltc_quiet2, *timeout {5})
+{
+    // This is a path where many different routes compete for the fastest path.
+    // In this case, we can win a more quiet path by giving up only a tiny bit
+    // of travel time.
+
+    // Note: Setting this value affects the the results we find. The results
+    //       may be subotpimal.
+    size_t maxNPaths {20};
+
+    // Here we select the fastest path because no path gives a 20% crowding
+    // improvement.
+    {
+        double maxSlowdownPc {0.1};
+        double minQuietnessPc {0.2};
+            auto [nw, resultTravelRoute] = GetTestNetwork(
+                "ltc_quiet2", true, true, "route_053"
+            );
+        auto travelRoute {nw.GetQuietTravelRoute(
+            "station_211",
+            "station_119",
+            maxSlowdownPc,
+            minQuietnessPc,
+            maxNPaths
+        )};
+        BOOST_CHECK_EQUAL(travelRoute, resultTravelRoute);
+    }
+
+    // A 10% crowding improvement is possible via route_049.
+    {
+        double maxSlowdownPc {0.1};
+        double minQuietnessPc {0.1};
+            auto [nw, resultTravelRoute] = GetTestNetwork(
+                "ltc_quiet2", true, true, "route_049"
+            );
+        auto travelRoute {nw.GetQuietTravelRoute(
+            "station_211",
+            "station_119",
+            maxSlowdownPc,
+            minQuietnessPc,
+            maxNPaths
+        )};
+        BOOST_CHECK_EQUAL(travelRoute, resultTravelRoute);
+    }
+}
+
+BOOST_AUTO_TEST_SUITE_END(); // GetQuietTravelRoute
 
 BOOST_AUTO_TEST_SUITE_END(); // Routes
 
