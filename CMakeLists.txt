@@ -70,6 +70,7 @@ set(TESTS_SOURCES
     "${CMAKE_CURRENT_SOURCE_DIR}/tests/stomp-frame.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/tests/network-monitor.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/tests/websocket-client-mock.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/tests/websocket-server.cpp"
 )
 add_executable(network-monitor-tests ${TESTS_SOURCES})
 target_compile_features(network-monitor-tests
