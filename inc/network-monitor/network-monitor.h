@@ -172,6 +172,7 @@ public:
             [this](auto ec) {
                 OnNetworkEventsConnect(ec);
             },
+            nullptr,
             [this](auto ec) {
                 OnNetworkEventsDisconnect(ec);
             }
@@ -242,7 +243,7 @@ public:
      *  \returns a reference to the internal `TransportNetwork` object instance.
      *           The object has the same lifetime as the `NetworkMonitor` class.
      */
-    TransportNetwork& GetNetworkRepresentation()
+    const TransportNetwork& GetNetworkRepresentation() const
     {
         return network_;
     }
